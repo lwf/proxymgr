@@ -1,5 +1,7 @@
 module ProxyMgr
   class ServiceManager
+    include Logging
+
     def initialize(sink)
       @services = {}
       @sink     = sink
@@ -8,20 +10,16 @@ module ProxyMgr
     end
 
     def update_service(service, data)
-      ProxyMgr.logger.info "Received updated service: #{service}, #{data.inspect}"
+      logger.info "Received updated service: #{service}, #{data.inspect}"
     end
 
-    def set_services(services)
-      ProxyMgr.logger.info "Received services: #{services.keys.join(', ')}"
+    def add_service(name, config)
+      logger.info "Received service: #{name}"
 
-      # TODO: shut down existing watchers, start new watchers
+      @services[name].shutdown if @services[name]
 
-      @services = services.inject({}) do |acc, (name, config)|
-        klass     = Watcher.const_get(config['type'].capitalize)
-        watcher   = klass.new(name, config, self)
-        acc[name] = watcher
-        acc
-      end
+      klass           = Watcher.const_get(config['type'].capitalize)
+      @services[name] = klass.new(name, config, self)
     end
 
     def update_backends

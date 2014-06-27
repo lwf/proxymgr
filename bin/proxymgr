@@ -4,8 +4,7 @@ $LOAD_PATH.unshift File.expand_path(File.join(__FILE__, '..', '..', 'lib'))
 require 'proxymgr'
 require 'logger'
 
-ProxyMgr.logger = Logger.new(STDOUT)
-ProxyMgr.logger.level = Logger::DEBUG
+ProxyMgr::Logging.level = Logger::DEBUG
 
 sink            = ProxyMgr::Sink.new
 service_manager = ProxyMgr::ServiceManager.new(sink)
@@ -16,6 +15,4 @@ Signal.trap(:INT) do
   exit 0
 end
 
-loop do
-  sleep 300
-end
+sleep

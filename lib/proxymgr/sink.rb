@@ -2,131 +2,141 @@ module ProxyMgr
   class Sink
     require 'absolute_time'
     require 'zlib'
+    require 'tempfile'
+    require 'pathname'
+    require 'set'
 
-    def initialize
-      @file            = '/tmp/haproxy.cfg'
+    include Logging
+
+    def initialize(opts = {})
+      @file            = opts[:haproxy_config_file] || '/tmp/haproxy.cfg'
+      @default_timeout = opts[:default_timeout] || 2
+      @max_timeout     = opts[:max_timeout] || 20
 
       @timeout         = nil
-      @default_timeout = 2
-      @max_timeout     = 20
+      @thread          = nil
+      @cv              = ConditionVariable.new
+      @mutex           = Mutex.new
 
-      @main_thread     = nil
-      @main_cv         = ConditionVariable.new
-      @main_mutex      = Mutex.new
+      @haproxy         = Haproxy.new('/tmp/haproxy', @file, :socket => "/tmp/stats.sock")
 
-      @haproxy_thread  = nil
-      @haproxy_mutex   = Mutex.new
-      @haproxy_cv      = ConditionVariable.new
+      @backends        = nil
 
-      start_haproxy
-      start_main
+      @haproxy.start
+      start
     end
 
     def write_backends(backends)
-      content = backends.map do |name, watcher|
-        next if watcher.servers.empty?
-        port = (Zlib.crc32(name) % 65534) + 1
-        <<EOF
-listen #{name} 0.0.0.0:#{port}
-  #{watcher.servers.map { |s| "server #{s} #{s}" }.join("\n  ")}
-EOF
+      logger.debug "Received new backends"
+      @mutex.synchronize do 
+        @backends ||= {}
+        backends.each do |name, watcher|
+          next if watcher.servers.empty?
+          @backends[name] = watcher
+        end
       end
-
-      @haproxy_mutex.synchronize { write(content.join("\n")) }
-
-      signal_haproxy
-      signal_main
+      signal
     end
 
     def shutdown
-      @main_thread.kill
-      @main_thread.join
-      @haproxy_thread.kill
-      @haproxy_thread.join
-      @pid.stop
-      @pid.wait
+      @thread.kill
+      @thread.join
+      @haproxy.stop
     end
 
     private
 
-    def start_main
-      @main_thread = Thread.new do
+    def start
+      @thread = Thread.new do
         t1 = nil
         loop do
-          if @timeout and t1 and AbsoluteTime.now-t1 >= @timeout
-            ProxyMgr.logger.info "Signaling haproxy to restart"
-            restart_haproxy
-            @timeout = nil
-          else
+          if @timeout and t1 and AbsoluteTime.now-t1 >= @timeout and @backends
+            @mutex.synchronize do
+              up, down = changed_backends
+
+              logger.debug "Hosts up: #{up.values.flatten.join(", ")}, hosts down: #{down.values.flatten.join(", ")}"
+              down.each do |backend, hosts| 
+                hosts.each { |host| @haproxy.down backend, host }
+              end
+
+              write_config
+
+              unless up.values.flatten.empty?
+                logger.info "Signaling haproxy to restart"
+                @haproxy.restart
+              end
+
+              @timeout = nil
+              @backends = nil
+            end
+          elsif t1
             @timeout = @timeout ? @timeout * @timeout : @default_timeout
 
             if @timeout > @max_timeout
               @timeout = @max_timeout
             end
+
+            logger.debug "Waiting for #{@timeout.to_s}s or signal"
           end
 
           t1 = AbsoluteTime.now
-          ProxyMgr.logger.debug "Waiting to be signalled"
+          logger.debug "Waiting to be signalled"
           wait
         end
       end
-      @main_thread.abort_on_exception = true
+      @thread.abort_on_exception = true
     end
 
-    def signal_main
-      @main_mutex.synchronize { @main_cv.signal }
+    def signal
+      @mutex.synchronize { @cv.signal }
     end
 
     def wait
-      @main_mutex.synchronize { @main_cv.wait(@main_mutex, @timeout) }
+      @mutex.synchronize { @cv.wait(@mutex, @timeout) }
     end
 
-    def start_haproxy
-      @haproxy_thread = Thread.new do
-        @haproxy_mutex.synchronize { @haproxy_cv.wait(@haproxy_mutex) }
-        run_haproxy
-
-        loop do
-          @haproxy_mutex.synchronize do
-            if @pid and ret = @pid.exit_code and ret > 0 and ret != 15
-              ProxyMgr.logger.warn "haproxy exited with status code #{ret}. Respawning in 5s"
-              sleep 5
-              run_haproxy
-            end
-          end
-          @pid.wait
-        end
-      end
-      @haproxy_thread.abort_on_exception = true
-    end
-
-    def run_haproxy(pid = nil)
-      args = ['-f', @file]
-      if pid
-        args << '-sf'
-        args << pid
-      end
-
-      @pid = ProcessManager.new('/tmp/haproxy', args)
-      @pid.start
-    end
-
-    def signal_haproxy
-      @haproxy_mutex.synchronize { @haproxy_cv.signal }
-    end
-
-    def restart_haproxy
-      @haproxy_mutex.synchronize { run_haproxy @pid.pid.to_s }
-    end
-
-    def write(contents)
+    def write_config
       f = nil
       begin
-        f = File.open(@file, 'w')
-        f.syswrite contents
-      ensure
-        f.close if f
+        f = Tempfile.new('haproxy')
+        content = "global\n\tstats socket /tmp/stats.sock mode 666 level admin\n"
+        content << @backends.map do |name, watcher|
+          "listen #{name} 0.0.0.0:#{Zlib.crc32(name) % 65535}\n  " +
+          watcher.servers.map { |host| "  server #{host} #{host}" }.join("\n")
+        end.join("\n")
+        f.write content
+        f.close
+        Pathname.new(f.path).rename(@file)
+      rescue Exception => e
+        logger.warn "Unable to write to #{@file}: #{e}"
+        File.unlink f.path if f
       end
+    end
+
+    def changed_backends
+      updated_state = Hash[@backends.map do |name, watcher|
+        [name, watcher.servers]
+      end]
+      up, down = updated_state, {}
+      if @haproxy.socket?
+        proxy_state = {}
+        @haproxy.stats.each do |stat|
+          if ["FRONTEND", "BACKEND"].include? stat["svname"] or stat["status"] == "MAINT"
+            next
+          end
+          backend = stat["pxname"]
+          server  = stat["svname"]
+          proxy_state[backend] ||= Set.new
+          proxy_state[backend] << server
+        end
+        proxy_state.each do |name, hosts|
+          down[name] = hosts.difference(updated_state[name]).to_a
+        end
+        updated_state.each do |name, hosts|
+          up[name] = hosts.to_set.difference(proxy_state[name]).to_a
+        end
+      end
+      [up, down]
     end
   end
 end
