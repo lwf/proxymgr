@@ -3,6 +3,8 @@ module ProxyMgr
     class File
       attr_reader :servers
 
+      include Logging
+
       def initialize(name, config, manager)
         @name     = name
         @manager  = manager
@@ -30,7 +32,7 @@ module ProxyMgr
                 @manager.update_backends
               end
             else
-              ProxyMgr.logger.info "#{@name} is not a file, ignoring..."
+              logger.info "#{@name} is not a file, ignoring..."
             end
 
             sleep 5

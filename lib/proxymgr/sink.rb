@@ -8,17 +8,16 @@ module ProxyMgr
 
     include Logging
 
-    def initialize(opts = {})
+    def initialize(haproxy, opts = {})
       @file            = opts[:haproxy_config_file] || '/tmp/haproxy.cfg'
       @default_timeout = opts[:default_timeout] || 2
       @max_timeout     = opts[:max_timeout] || 20
+      @haproxy         = haproxy
 
       @timeout         = nil
       @thread          = nil
       @cv              = ConditionVariable.new
       @mutex           = Mutex.new
-
-      @haproxy         = Haproxy.new('/tmp/haproxy', @file, :socket => "/tmp/stats.sock")
 
       @backends        = nil
 
@@ -52,16 +51,19 @@ module ProxyMgr
         loop do
           if @timeout and t1 and AbsoluteTime.now-t1 >= @timeout and @backends
             @mutex.synchronize do
-              up, down = changed_backends
+              changeset = find_existing_backends
 
-              logger.debug "Hosts up: #{up.values.flatten.join(", ")}, hosts down: #{down.values.flatten.join(", ")}"
-              down.each do |backend, hosts| 
-                hosts.each { |host| @haproxy.down backend, host }
+              changeset.disable.each do |backend, hosts| 
+                hosts.each { |host| @haproxy.disable backend, host }
+              end
+
+              changeset.enable.each do |backend, hosts|
+                hosts.each { |host| @haproxy.enable backend, host }
               end
 
               write_config
 
-              unless up.values.flatten.empty?
+              if changeset.restart_needed?
                 logger.info "Signaling haproxy to restart"
                 @haproxy.restart
               end
@@ -113,30 +115,45 @@ module ProxyMgr
       end
     end
 
-    def changed_backends
-      updated_state = Hash[@backends.map do |name, watcher|
-        [name, watcher.servers]
-      end]
-      up, down = updated_state, {}
+    def find_existing_backends
       if @haproxy.socket?
-        proxy_state = {}
-        @haproxy.stats.each do |stat|
-          if ["FRONTEND", "BACKEND"].include? stat["svname"] or stat["status"] == "MAINT"
-            next
+        new_state = Hash[@backends.map { |name, watcher| [name, watcher.servers] }]
+        old_state = @haproxy.servers.inject({}) do |servers, server|
+          backend = servers[server.backend] ||= {:disabled => [], :enabled => []}
+          if server.disabled?
+            backend[:disabled] << server.name
+          else
+            backend[:enabled] << server.name
           end
-          backend = stat["pxname"]
-          server  = stat["svname"]
-          proxy_state[backend] ||= Set.new
-          proxy_state[backend] << server
+          servers
         end
-        proxy_state.each do |name, hosts|
-          down[name] = hosts.difference(updated_state[name]).to_a
+        restart_needed = new_state.keys.sort != old_state.keys.sort
+        changeset = ChangeSet.new(restart_needed, {}, {})
+        new_state.inject(changeset) do |cs, (backend, servers)|
+          if old_state[backend]
+            enabled    = Set.new(old_state[backend][:enabled])
+            to_disable = enabled.difference(servers)
+
+            disabled  = old_state[backend][:disabled]
+            to_enable = (disabled & servers)
+            if ((enabled - to_disable) + to_enable).sort != servers.sort
+              cs.restart_needed = true
+            end
+
+            cs.disable[backend] = to_disable
+            cs.enable[backend]  = to_enable
+          end
+          cs
         end
-        updated_state.each do |name, hosts|
-          up[name] = hosts.to_set.difference(proxy_state[name]).to_a
-        end
+      else
+        ChangeSet.new(true, {}, {})
       end
-      [up, down]
+    end
+
+    class ChangeSet < Struct.new(:restart_needed, :disable, :enable)
+      def restart_needed?
+        restart_needed
+      end
     end
   end
 end

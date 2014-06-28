@@ -17,6 +17,10 @@ module ProxyMgr
       @mutex            = Mutex.new
     end
 
+    def version
+      `#{@path} -v`[/version ([\d\.]+)/, 1].to_f
+    end
+
     def start
       run
 
@@ -48,7 +52,16 @@ module ProxyMgr
     end
 
     def socket?
-      @socket
+      @socket and File.exists? @socket.path
+    end
+
+    def servers
+      stats.inject([]) do |acc, stat|
+        unless ["FRONTEND", "BACKEND"].include? stat["svname"]
+          acc << Server.new(self, stat)
+        end
+        acc
+      end
     end
 
     def stats
@@ -58,12 +71,16 @@ module ProxyMgr
       rest.map { |d| Hash[headers.zip(d.split(","))] }
     end
 
-    def down(backend, host, opts = {:shutdown => false})
-      @socket.write "disable server #{backend}/#{host}"
+    def enable(backend, host)
+      @socket.write "enable server #{backend}/#{host}"
+    end
 
-      if opts[:shutdown]
-        @socket.write "shutdown sessions server #{backend}/#{host}"
-      end
+    def disable(backend, host)
+      @socket.write "disable server #{backend}/#{host}"
+    end
+
+    def shutdown(backend, host)
+      @socket.write "shutdown sessions server #{backend}/#{host}"
     end
 
     private
@@ -82,6 +99,8 @@ module ProxyMgr
     class Socket
       require 'socket'
 
+      attr_reader :path
+
       def initialize(path)
         @path = path
       end
@@ -97,6 +116,35 @@ module ProxyMgr
 
       def with
         yield UNIXSocket.new(@path)
+      end
+    end
+
+    class Server
+      attr_reader :stats
+
+      def initialize(haproxy, stats)
+        @haproxy = haproxy
+        @stats   = stats
+      end
+
+      def backend
+        @stats['pxname']
+      end
+
+      def name
+        @stats['svname']
+      end
+
+      def disable
+        @haproxy.disable backend, name
+      end
+
+      def shutdown
+        @haproxy.shutdown backend, name
+      end
+
+      def disabled?
+        @stats['status'] == "MAINT"
       end
     end
   end

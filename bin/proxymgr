@@ -6,7 +6,15 @@ require 'logger'
 
 ProxyMgr::Logging.level = Logger::DEBUG
 
-sink            = ProxyMgr::Sink.new
+haproxy         = ProxyMgr::Haproxy.new("/tmp/haproxy",
+                                        "/tmp/haproxy.cfg",
+                                        :socket => "/tmp/stats.sock")
+if haproxy.version < 1.5
+  $stderr.puts "ProxyMgr requires haproxy version 1.5 or later."
+  exit 1
+end
+
+sink            = ProxyMgr::Sink.new(haproxy)
 service_manager = ProxyMgr::ServiceManager.new(sink)
 config          = ProxyMgr::Config.new(service_manager)
 
