@@ -1,5 +1,7 @@
 module ProxyMgr
   module Logging
+    require 'logger'
+
     def logger
       @logger ||= Logging.logger(self.class)
     end

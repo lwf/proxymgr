@@ -2,25 +2,57 @@
 $LOAD_PATH.unshift File.expand_path(File.join(__FILE__, '..', '..', 'lib'))
 
 require 'proxymgr'
-require 'logger'
+require 'yaml'
+require 'docopt'
 
-ProxyMgr::Logging.level = Logger::DEBUG
+opt = <<OPT
+ProxyMgr manages Haproxy dynamically.
 
-haproxy         = ProxyMgr::Haproxy.new("/tmp/haproxy",
-                                        "/tmp/haproxy.cfg",
-                                        :socket => "/tmp/stats.sock")
+Usage:
+  #{__FILE__} -c=<path> | --config=<path> [-d|--debug]
+
+Options:
+  -c=<path> --config=<path>   Set configuration file path
+  -d --debug                  Turn on debug logging
+OPT
+
+begin
+  require 'pp'
+  opts = Docopt.docopt(opt)
+rescue Docopt::Exit => e
+  $stderr.puts e.message
+  exit 1
+end
+
+ProxyMgr::Logging.level = opts['--debug'] ? Logger::DEBUG : Logger::INFO
+
+config          =  YAML.load_file(opts['--config'])
+
+haproxy_config  = config['haproxy']
+haproxy         = ProxyMgr::Haproxy.new(haproxy_config['path'],
+                                        haproxy_config['config_path'],
+                                        :socket => haproxy_config['socket_path'])
 if haproxy.version < 1.5
   $stderr.puts "ProxyMgr requires haproxy version 1.5 or later."
   exit 1
 end
 
-sink            = ProxyMgr::Sink.new(haproxy)
-service_manager = ProxyMgr::ServiceManager.new(sink)
-config          = ProxyMgr::Config.new(service_manager)
+service_manager   = nil
+begin
+  sink            = ProxyMgr::Sink.new(haproxy)
+  service_manager = ProxyMgr::ServiceManager.new(sink)
+  config          = ProxyMgr::Config.new(service_manager)
 
-Signal.trap(:INT) do 
-  Thread.new { service_manager.shutdown }.join
-  exit 0
+  [:INT, :TERM].each do |sig|
+    Signal.trap(sig) do 
+      Thread.new { service_manager.shutdown }.join
+      exit 0
+    end
+  end
+
+  sleep
+rescue SystemExit
+rescue Exception => e
+  service_manager.shutdown if service_manager
+  raise e
 end
-
-sleep

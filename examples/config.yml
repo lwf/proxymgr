@@ -1,0 +1,5 @@
+---
+haproxy:
+  path: /tmp/haproxy
+  config_path: /tmp/haproxy.cfg
+  socket_path: /tmp/stats.sock

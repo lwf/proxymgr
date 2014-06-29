@@ -1,0 +1,16 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    absolute_time (1.0.0)
+    docopt (0.5.0)
+    state_machine (1.2.0)
+    zookeeper (1.4.8)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  absolute_time
+  docopt
+  state_machine
+  zookeeper
