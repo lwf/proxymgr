@@ -41,7 +41,7 @@ service_manager   = nil
 begin
   sink            = ProxyMgr::Sink.new(haproxy)
   service_manager = ProxyMgr::ServiceManager.new(sink)
-  config          = ProxyMgr::Config.new(service_manager)
+  service_config  = ProxyMgr::ServiceConfig.new(service_manager)
 
   [:INT, :TERM].each do |sig|
     Signal.trap(sig) do 

@@ -1,5 +1,5 @@
 module ProxyMgr
-  class Config
+  class ServiceConfig
     def initialize(manager)
       @manager = manager
       @manager.add_service("test_service", {"port" => 8080,
