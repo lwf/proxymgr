@@ -1,8 +1,6 @@
 module ProxyMgr
   module Watcher
     class Zookeeper
-      require 'state_machine'
-
       include Logging
 
       attr_reader :servers
