@@ -26,7 +26,12 @@ end
 
 ProxyMgr::Logging.level = opts['--debug'] ? Logger::DEBUG : Logger::INFO
 
-config          =  YAML.load_file(opts['--config'])
+begin
+  config = ProxyMgr::Config.new(opts['--config'])
+rescue ProxyMgr::Config::ConfigException => e
+  $stderr.puts "config file failed to validate: #{e.message}"
+  exit 1
+end
 
 haproxy_config  = config['haproxy']
 haproxy         = ProxyMgr::Haproxy.new(haproxy_config['path'],
