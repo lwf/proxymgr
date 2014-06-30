@@ -20,7 +20,7 @@ module ProxyMgr
 
     def initialize(file)
       data    = interpolate_variables(File.read(file))
-      @config = YAML.load(data)
+      @config = YAML.load(data) || {}
 
       merge_defaults!
       validate_config
@@ -44,7 +44,11 @@ module ProxyMgr
 
     def merge_defaults!
       DEFAULTS.each do |key, value|
-        @config[key] = value.merge(@config[key] || {})
+        if @config[key]
+          @config[key] = value.merge(@config[key])
+        else
+          @config[key] = value
+        end
       end
     end
 
