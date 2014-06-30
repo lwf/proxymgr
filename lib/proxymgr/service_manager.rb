@@ -23,7 +23,7 @@ module ProxyMgr
     end
 
     def update_backends
-      @mutex.synchronize { @sink.write_backends @services }
+      @mutex.synchronize { @sink.update_backends @services }
     end
 
     def shutdown

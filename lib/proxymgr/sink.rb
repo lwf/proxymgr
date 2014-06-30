@@ -25,7 +25,7 @@ module ProxyMgr
       start
     end
 
-    def write_backends(backends)
+    def update_backends(backends)
       logger.debug "Received new backends"
       @mutex.synchronize do 
         @backends ||= {}
