@@ -1,75 +1,42 @@
 module ProxyMgr
-  class ZKClient 
+  class ZKClient
     require 'zookeeper'
-    require 'state_machine'
 
     include Logging
     include Callbacks
-
-    state_machine :state, :initial => :disconnected do
-      after_transition [:expired, :disconnected] => :connecting do |fsm|
-        fsm.reopen
-      end
-
-      after_transition :connecting => :expired do |fsm|
-        fsm.call(:on_expired)
-        fsm.connect
-      end
-
-      after_transition :connected => :disconnected do |fsm|
-        fsm.call(:on_disconnected)
-        fsm.connect
-      end
-
-      after_transition :connecting => :connected do |fsm|
-        fsm.call(:on_connected)
-      end
-
-      event :connect do
-        transition [:disconnected, :expired] => :connecting
-      end
-
-      event :connected do
-        transition :connecting => :connected
-      end
-
-      event :connecting do
-        transition :connected => :disconnected
-      end
-
-      event :expired do
-        transition :connecting => :expired
-      end
-    end
 
     def initialize(servers = 'localhost:2181', opts = {})
       super()
 
       @servers   = servers
       @heartbeat = opts[:heartbeat] || 2000
+      @mutex     = Mutex.new
 
       callbacks :on_connected, :on_expired, :on_disconnected
     end
 
-    def reopen
-      if @zookeeper
-        @zookeeper.reopen
-      else
-        watcher = lambda do |event|
-          case event[:state]
-          when ::Zookeeper::ZOO_CONNECTED_STATE
-            logger.debug "Received connected state"
-            connected
-          when ::Zookeeper::ZOO_CONNECTING_STATE
-            logger.debug "Received connecting state"
-            connecting
-          when ::Zookeeper::ZOO_EXPIRED_SESSION_STATE
-            logger.debug "Received expired state"
-            expired
-          end
+    def connect
+      logger.debug "Connect to ZK"
+      watcher = lambda do |event|
+        case event[:state]
+        when ::Zookeeper::ZOO_CONNECTED_STATE
+          logger.debug "Received connected state"
+          call(:on_connected)
+        when ::Zookeeper::ZOO_CONNECTING_STATE
+          logger.debug "Received connecting state"
+          call(:on_disconnected)
+        when ::Zookeeper::ZOO_EXPIRED_SESSION_STATE
+          logger.debug "Received expired state"
+          call(:on_expired)
+          reopen
         end
-        @zookeeper = ::Zookeeper.new(@servers, @heartbeat, watcher)
       end
+      @zookeeper = ::Zookeeper.new(@servers, @heartbeat, watcher)
+    end
+
+    def reopen
+      logger.debug "reopen it"
+      @zookeeper.reopen
     end
 
     def when_path(path, &blk)
@@ -77,6 +44,7 @@ module ProxyMgr
     end
 
     def method_missing(sym, *args, &blk)
+      logger.debug "Call to zookeeper"
       @zookeeper.send(sym, *args, &blk)
     end
 
@@ -87,7 +55,7 @@ module ProxyMgr
         next_path = join(wait_path, rest.first)
         if @zookeeper.get(:path => next_path)[:rc] == ::Zookeeper::ZOK
           if next_path == complete_path
-            logger.debug "#{current_path} now exists, watching it"
+            logger.debug "#{complete_path} now exists, watching it"
             blk.call
           else
             logger.debug "#{next_path} exists, moving on to next"
