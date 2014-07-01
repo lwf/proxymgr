@@ -7,6 +7,7 @@ defaults
 <% end %>
 <% backends.each do |name, watcher| %>listen <%= name %> 0.0.0.0:<%= watcher.port %>
 <% if watcher.listen_options %><% watcher.listen_options.each do |line| %>  <%= line %>
-<% end %><% end %>
+<% end %>
+<% end %>
 <% watcher.servers.each do |server| %>  server <%= server %> <%= server %><% if watcher.server_options %> <%= watcher.server_options.join(' ') %><% end %>
 <% end %><% end %>
