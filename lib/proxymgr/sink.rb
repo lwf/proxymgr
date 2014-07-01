@@ -1,9 +1,6 @@
 module ProxyMgr
   class Sink
     require 'absolute_time'
-    require 'zlib'
-    require 'tempfile'
-    require 'pathname'
     require 'set'
 
     include Logging
@@ -61,7 +58,7 @@ module ProxyMgr
                 hosts.each { |host| @haproxy.enable backend, host }
               end
 
-              write_config
+              @haproxy.write_config(@backends)
 
               if changeset.restart_needed?
                 logger.info "Signaling haproxy to restart"
@@ -97,23 +94,6 @@ module ProxyMgr
       @mutex.synchronize { @cv.wait(@mutex, @timeout) }
     end
 
-    def write_config
-      f = nil
-      begin
-        f = Tempfile.new('haproxy')
-        content = "global\n\tstats socket /tmp/stats.sock mode 666 level admin\n"
-        content << @backends.map do |name, watcher|
-          "listen #{name} 0.0.0.0:#{Zlib.crc32(name) % 65535}\n  " +
-          watcher.servers.map { |host| "  server #{host} #{host}" }.join("\n")
-        end.join("\n")
-        f.write content
-        f.close
-        Pathname.new(f.path).rename(@file)
-      rescue Exception => e
-        logger.warn "Unable to write to #{@file}: #{e}"
-        File.unlink f.path if f
-      end
-    end
 
     def find_existing_backends
       if @haproxy.socket?

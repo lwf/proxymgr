@@ -1,6 +1,9 @@
 module ProxyMgr
   class Haproxy
     require 'thread'
+    require 'zlib'
+    require 'tempfile'
+    require 'pathname'
     require 'proxymgr/process_manager'
 
     include Logging
@@ -37,6 +40,24 @@ module ProxyMgr
         end
       end
       @thread.abort_on_exception = true
+    end
+
+    def write_config(backends)
+      f = nil
+      begin
+        f = Tempfile.new('haproxy')
+        content = "global\n\tstats socket /tmp/stats.sock mode 666 level admin\n"
+        content << backends.map do |name, watcher|
+          "listen #{name} 0.0.0.0:#{Zlib.crc32(name) % 65535}\n  " +
+          watcher.servers.map { |host| "  server #{host} #{host}" }.join("\n")
+        end.join("\n")
+        f.write content
+        f.close
+        Pathname.new(f.path).rename(@config_file)
+      rescue Exception => e
+        logger.warn "Unable to write to #{@config_file}: #{e}"
+        File.unlink f.path if f
+      end
     end
 
     def restart
@@ -86,7 +107,7 @@ module ProxyMgr
     private
 
     def run(pid = nil)
-      args = ['-f', @config_file]
+      args = ['-f', @config_file, '-db']
       if pid
         args << '-sf'
         args << pid.to_s
