@@ -115,7 +115,20 @@ module ProxyMgr
       end
 
       @process = ProcessManager.new(@path, args)
+      [:on_stdout, :on_stderr].each do |cb|
+        @process.send(cb, &method(:parse_haproxy_log))
+      end
       @process.start
+    end
+
+    def parse_haproxy_log(line)
+      if matches = line.scan(/^\[(.*)\] (.*)/)[0]
+        haproxy_level, msg = matches
+        level = haproxy_level == "WARNING" ? :warn : :info
+        logger.send(level, msg)
+      else
+        logger.info(line)
+      end
     end
 
     class Socket

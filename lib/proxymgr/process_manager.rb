@@ -2,20 +2,19 @@ module ProxyMgr
   class ProcessManager
     require 'timeout'
 
-    include Logging
-
     attr_reader :exit_code, :pid
 
     def initialize(cmd, args = [], opts = {})
-      @cmd       = cmd
-      @args      = args
-      @pid       = nil
-      @exit_code = nil
+      @cmd        = cmd
+      @args       = args
+      @pid        = nil
+      @exit_code  = nil
+
+      @timeout    = opts[:timeout] || 10
+      @setsid     = opts[:setsid] || true
 
       @io_handler = nil
-
-      @timeout   = opts[:timeout] || 10
-      @setsid    = opts[:setsid] || true
+      @callbacks  = {}
     end
 
     def start
@@ -42,7 +41,7 @@ module ProxyMgr
           r, w, e = IO.select(fdset, [], fdset)
           out = {}
           r.each do |pipe|
-            stream = pipe == stdout_read ? "stdout" : "stderr"
+            stream = pipe == stdout_read ? :stdout : :stderr
             buf = out[stream] ||= ""
             begin
               loop { buf << pipe.read_nonblock(4096) }
@@ -51,7 +50,7 @@ module ProxyMgr
             stop = pipe.eof?
           end
           out.each do |stream, buf|
-            buf.split(/\n/).each { |line| logger.info "#{stream}: #{line}" }
+            buf.split(/\n/).each { |line| call(stream, line) }
           end
         end
       end
@@ -78,6 +77,19 @@ module ProxyMgr
         pid, result = Process.waitpid2 @pid
         @exit_code = result.exitstatus || result.termsig
       rescue Errno::ECHILD
+      end
+    end
+
+    [:on_stdout, :on_stderr].each do |callback|
+      define_method(callback) { |&blk| @callbacks[callback] ||= blk }
+    end
+
+    private
+
+    def call(stream, line)
+      callback = "on_#{stream.to_s}".to_sym
+      if respond_to? callback and cb = send(callback)
+        cb.call line
       end
     end
   end
