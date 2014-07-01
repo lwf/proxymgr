@@ -36,27 +36,31 @@ module ProxyMgr
       [stdout_write, stderr_write].each(&:close)
 
       @thread = Thread.new do
-        running = true
-        while running
-          puts "top loop #{Thread.current.object_id}"
+        stop = false
+        until stop
           fdset = [stdout_read, stderr_read]
           r, w, e = IO.select(fdset, [], fdset)
+          out = {}
           r.each do |pipe|
-            buf = ''
+            stream = pipe == stdout_read ? "stdout" : "stderr"
+            buf = out[stream] ||= ""
             begin
-              loop { buf << pipe.read_nonblock(4096); p buf }
-            rescue Errno::EWOULDBLOCK
+              loop { buf << pipe.read_nonblock(4096) }
+            rescue Errno::EWOULDBLOCK, EOFError
             end
-            buf.split(/\n/).each { |line| logger.info line }
-            running = pipe.eof?
+            stop = pipe.eof?
+          end
+          out.each do |stream, buf|
+            buf.split(/\n/).each { |line| logger.info "#{stream}: #{line}" }
           end
         end
-        puts "stopped #{Thread.current.object_id}"
       end
+      @thread.abort_on_exception = true
+
+      @pid
     end
 
     def stop
-      p @pid
       Process.kill("TERM", @pid)
       begin
         Timeout.timeout(@timeout) { wait }
