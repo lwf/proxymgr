@@ -21,7 +21,7 @@ module ProxyMgr
         when ::Zookeeper::ZOK
           update_servers(req[:children])
         when ::Zookeeper::ZNONODE
-          @zookeeper.when_path(@config['path']) { watch }
+          @zookeeper.when_path(@config['path']) { watch_zookeeper }
         else
           logger.warn "get_children returned #{req[:rc].to_s}"
         end
