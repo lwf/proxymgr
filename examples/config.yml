@@ -1,5 +1,5 @@
 ---
 haproxy:
-  path: {{ haproxy_path }}
+  path: /tmp/haproxy
   config_path: /tmp/haproxy.cfg
   socket_path: /tmp/stats.sock

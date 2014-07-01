@@ -7,3 +7,13 @@ require 'proxymgr/process_manager'
 require 'proxymgr/haproxy'
 require 'proxymgr/sink'
 require 'proxymgr/watcher'
+
+module ProxyMgr
+  def self.root
+    File.expand_path(File.join(__FILE__, '..', '..'))
+  end
+
+  def self.template_dir
+    File.join(root, 'etc')
+  end
+end

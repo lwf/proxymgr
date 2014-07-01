@@ -29,14 +29,16 @@ ProxyMgr::Logging.level = opts['--debug'] ? Logger::DEBUG : Logger::INFO
 begin
   config = ProxyMgr::Config.new(opts['--config'])
 rescue ProxyMgr::Config::ConfigException => e
-  $stderr.puts "config file failed to validate: #{e.message}"
+  $stderr.puts "config file #{opts['--config']} failed to validate: #{e.message}"
   exit 1
 end
 
 haproxy_config  = config['haproxy']
 haproxy         = ProxyMgr::Haproxy.new(haproxy_config['path'],
                                         haproxy_config['config_path'],
-                                        :socket => haproxy_config['socket_path'])
+                                        :socket   => haproxy_config['socket_path'],
+                                        :global   => haproxy_config['global'],
+                                        :defaults => haproxy_config['defaults'])
 if haproxy.version < 1.5
   $stderr.puts "ProxyMgr requires haproxy version 1.5 or later."
   exit 1

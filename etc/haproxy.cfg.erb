@@ -1,0 +1,8 @@
+global
+  <% if @socket_path %>stats socket <%= @socket_path %> mode 666 level admin<% end %>
+<% @global_config.each do |line| %>  <%= line %>
+<% end %>
+<% backends.each do |name, watcher| %>listen <%= name %> 0.0.0.0:<%= Zlib.crc32(name) % 65535 %>
+<% @defaults_config.each do |line| %>  <%= line %>
+<% end %><% watcher.servers.each do |server| %>  server <%= server %> <%= server %>
+<% end %><% end %>

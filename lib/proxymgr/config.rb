@@ -6,7 +6,21 @@ module ProxyMgr
       'haproxy' => {
         'path'        => 'haproxy',
         'config_path' => '/etc/haproxy/haproxy.cfg',
-        'socket_path' => '/var/lib/haproxy.sock'
+        'socket_path' => '/var/lib/haproxy.sock',
+        'global'      => ['user haproxy',
+                          'group haproxy',
+                          'maxconn 4096',
+                          'log  127.0.0.1 local0',
+                          'log  127.0.0.1 local1 notice'],
+        'defaults'    => ['log global',
+                          'option dontlognull',
+                          'maxconn 2000',
+                          'retries 3',
+                          'timeout connect 5s',
+                          'timeout client 1m',
+                          'timeout server 1m',
+                          'option redispatch',
+                          'balance roundrobin']
       }
     }
 
@@ -14,7 +28,9 @@ module ProxyMgr
       'haproxy' => {
         'path' => :executable,
         'config_path' => :fullpath,
-        'socket_path' => :fullpath
+        'socket_path' => :fullpath,
+        'global'      => :array_of_strings,
+        'default'     => :array_of_strings
       }
     }
 
@@ -80,6 +96,14 @@ module ProxyMgr
               File.executable? exe
             else
               ENV['PATH'].split(':').find { |e| File.executable? File.join(e, exe) }
+            end
+          end
+        end
+
+        def array_of_strings(key, ary)
+          ary.each_with_index do |value, i|
+            should("#{key}[#{i.to_s}] should be a string") do
+              value.is_a? String
             end
           end
         end

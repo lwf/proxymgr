@@ -4,6 +4,7 @@ module ProxyMgr
     require 'zlib'
     require 'tempfile'
     require 'pathname'
+    require 'erb'
     require 'proxymgr/process_manager'
 
     include Logging
@@ -12,8 +13,13 @@ module ProxyMgr
       @path             = path
       @config_file      = config_file
 
-      @socket           = opts[:socket] ? Socket.new(opts[:socket]) : nil
+      @socket_path      = opts[:socket]
       @respawn_interval = opts[:respawn_interval] || 5
+      @global_config    = opts[:global]
+      @defaults_config  = opts[:defaults]
+
+      @socket           = @socket ? Socket.new(opts[:socket]) : nil
+      @config_template  = ERB.new(File.read(File.join(ProxyMgr.template_dir, 'haproxy.cfg.erb')))
 
       @process          = nil
       @thread           = nil
@@ -46,12 +52,7 @@ module ProxyMgr
       f = nil
       begin
         f = Tempfile.new('haproxy')
-        content = "global\n\tstats socket /tmp/stats.sock mode 666 level admin\n"
-        content << backends.map do |name, watcher|
-          "listen #{name} 0.0.0.0:#{Zlib.crc32(name) % 65535}\n  " +
-          watcher.servers.map { |host| "  server #{host} #{host}" }.join("\n")
-        end.join("\n")
-        f.write content
+        f.write @config_template.result(binding)
         f.close
         Pathname.new(f.path).rename(@config_file)
       rescue Exception => e
