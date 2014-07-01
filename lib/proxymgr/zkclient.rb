@@ -4,6 +4,7 @@ module ProxyMgr
     require 'state_machine'
 
     include Logging
+    include Callbacks
 
     state_machine :state, :initial => :disconnected do
       after_transition [:expired, :disconnected] => :connecting do |fsm|
@@ -41,13 +42,13 @@ module ProxyMgr
       end
     end
 
-    attr_accessor :on_expired, :on_connected, :on_disconnected
-
     def initialize(servers = 'localhost:2181', opts = {})
       super()
 
       @servers   = servers
       @heartbeat = opts[:heartbeat] || 2000
+
+      callbacks :on_connected, :on_expired, :on_disconnected
     end
 
     def reopen
@@ -68,12 +69,6 @@ module ProxyMgr
           end
         end
         @zookeeper = ::Zookeeper.new(@servers, @heartbeat, watcher)
-      end
-    end
-
-    def call(event_type)
-      if blk = send(event_type)
-        blk.call
       end
     end
 

@@ -1,5 +1,6 @@
 module ProxyMgr
   module Watcher
+    require 'proxymgr/watcher/base'
     require 'proxymgr/watcher/dns'
     require 'proxymgr/watcher/file'
     require 'proxymgr/watcher/zookeeper'

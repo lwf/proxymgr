@@ -1,22 +1,9 @@
 module ProxyMgr
   module Watcher
-    class Zookeeper
-      include Logging
-
-      attr_reader :servers
-
-      def initialize(name, config, manager)
-        @name     = name
-        @manager  = manager
-        @config   = config
-
-        @servers  = []
-
-        super()
-
+    class Zookeeper < Base
+      def watch
         @zookeeper = ZKClient.new
-        @zookeeper.on_connected = lambda { watch }
-
+        @zookeeper.on_connected { watch_zookeeper }
         @zookeeper.connect
       end
 
@@ -24,7 +11,9 @@ module ProxyMgr
         @zookeeper.close
       end
 
-      def watch
+      private
+
+      def watch_zookeeper
         # TODO: synchronized. watch could be called from the zookeeper thread while we're running
         cb = ::Zookeeper::Callbacks::WatcherCallback.new { |event| watch }
         req = @zookeeper.get_children(:path => @config['path'], :watcher => cb)

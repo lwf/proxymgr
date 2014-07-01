@@ -1,24 +1,7 @@
 module ProxyMgr
   module Watcher
-    class Dns
+    class Dns < Base
       require 'resolv'
-
-      attr_reader :servers
-
-      def initialize(name, config, manager)
-        @name     = name
-        @manager  = manager
-        @config   = config
-
-        @servers  = []
-
-        @thread   = nil
-
-        watch
-      end
-
-      def shutdown
-      end
 
       private
 

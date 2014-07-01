@@ -1,5 +1,6 @@
 require 'proxymgr/logging'
 require 'proxymgr/config'
+require 'proxymgr/callbacks'
 require 'proxymgr/zkclient'
 require 'proxymgr/service_manager'
 require 'proxymgr/service_config'
