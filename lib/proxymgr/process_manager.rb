@@ -82,9 +82,5 @@ module ProxyMgr
       rescue Errno::ECHILD
       end
     end
-
-    [:on_stdout, :on_stderr].each do |callback|
-      define_method(callback) { |&blk| @callbacks[callback] ||= blk }
-    end
   end
 end
