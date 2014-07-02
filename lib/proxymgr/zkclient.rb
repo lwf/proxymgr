@@ -44,26 +44,28 @@ module ProxyMgr
     end
 
     def method_missing(sym, *args, &blk)
-      logger.debug "Call to zookeeper"
+      logger.debug "Call to zookeeper #{sym.to_s}: #{args.map(&:to_s).join(',')}"
       @zookeeper.send(sym, *args, &blk)
     end
 
     private
 
     def wait_for_path(complete_path, wait_path, rest = [], &blk)
-      cb = ::Zookeeper::Callbacks::WatcherCallback.new do |event|
-        next_path = join(wait_path, rest.first)
-        if @zookeeper.get(:path => next_path)[:rc] == ::Zookeeper::ZOK
-          if next_path == complete_path
-            logger.debug "#{complete_path} now exists, watching it"
-            blk.call
+      cb = ::Zookeeper::Callbacks::WatcherCallback.create do |event|
+        if event.type != ::Zookeeper::ZOO_SESSION_EVENT
+          next_path = join(wait_path, rest.first)
+          if @zookeeper.get(:path => next_path)[:rc] == ::Zookeeper::ZOK
+            if next_path == complete_path
+              logger.debug "#{complete_path} now exists, watching it"
+              blk.call
+            else
+              logger.debug "#{next_path} exists, moving on to next"
+              rest.shift
+              wait_for_path(complete_path, next_path, rest, &blk)
+            end
           else
-            logger.debug "#{next_path} exists, moving on to next"
-            rest.shift
-            wait_for_path(complete_path, next_path, rest, &blk)
+            wait_for_path(complete_path, wait_path, rest, &blk)
           end
-        else
-          wait_for_path(complete_path, wait_path, rest, &blk)
         end
       end
 
