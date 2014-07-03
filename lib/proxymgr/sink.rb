@@ -10,21 +10,18 @@ module ProxyMgr
       @default_timeout = opts[:default_timeout] || 2
       @max_timeout     = opts[:max_timeout] || 20
       @haproxy         = haproxy
-
       @timeout         = nil
       @thread          = nil
       @cv              = ConditionVariable.new
       @mutex           = Mutex.new
-
       @backends        = nil
-
       @haproxy.start
       start
     end
 
     def update_backends(backends)
-      logger.debug "Received new backends"
-      @mutex.synchronize do 
+      logger.debug 'Received new backends'
+      @mutex.synchronize do
         @backends ||= {}
         backends.each do |name, watcher|
           next if watcher.servers.empty?
@@ -46,11 +43,11 @@ module ProxyMgr
       @thread = Thread.new do
         t1 = nil
         loop do
-          if @timeout and t1 and AbsoluteTime.now-t1 >= @timeout and @backends
+          if @timeout && t1 && AbsoluteTime.now - t1 >= @timeout && @backends
             @mutex.synchronize do
               changeset = find_existing_backends
 
-              changeset.disable.each do |backend, hosts| 
+              changeset.disable.each do |backend, hosts|
                 hosts.each { |host| @haproxy.disable backend, host }
               end
 
@@ -61,7 +58,7 @@ module ProxyMgr
               @haproxy.write_config(@backends)
 
               if changeset.restart_needed?
-                logger.info "Signaling haproxy to restart"
+                logger.info 'Signaling haproxy to restart'
                 @haproxy.restart
               end
 
@@ -70,16 +67,13 @@ module ProxyMgr
             end
           elsif t1
             @timeout = @timeout ? @timeout * @timeout : @default_timeout
-
-            if @timeout > @max_timeout
-              @timeout = @max_timeout
-            end
+            @timeout = @max_timeout if @timeout > @max_timeout
 
             logger.debug "Waiting for #{@timeout.to_s}s or signal"
           end
 
           t1 = AbsoluteTime.now
-          logger.debug "Waiting to be signalled"
+          logger.debug 'Waiting to be signalled'
           wait
         end
       end

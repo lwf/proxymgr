@@ -40,7 +40,7 @@ haproxy         = ProxyMgr::Haproxy.new(haproxy_config['path'],
                                         :global   => haproxy_config['global'],
                                         :defaults => haproxy_config['defaults'])
 if haproxy.version < 1.5
-  $stderr.puts "ProxyMgr requires haproxy version 1.5 or later."
+  $stderr.puts 'ProxyMgr requires haproxy version 1.5 or later.'
   exit 1
 end
 
@@ -52,7 +52,7 @@ begin
                                                    config['service_config'])
 
   [:INT, :TERM].each do |sig|
-    Signal.trap(sig) do 
+    Signal.trap(sig) do
       Thread.new { service_manager.shutdown }.join
       exit 0
     end

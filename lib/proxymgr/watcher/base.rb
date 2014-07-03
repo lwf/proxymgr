@@ -16,17 +16,17 @@ module ProxyMgr
         @port           = @config['port']
 
         unless @port
-          warn "port is not defined"
+          warn 'port is not defined'
           return
         end
 
-        unless !@listen_options or @listen_options.kind_of? Array
-          warn "listen_options is not an array"
+        unless !@listen_options or @listen_options.is_a? Array
+          warn 'listen_options is not an array'
           return
         end
 
-        unless !@server_options or @server_options.kind_of? Array
-          warn "server_options is not an array"
+        unless !@server_options or @server_options.is_a? Array
+          warn 'server_options is not an array'
           return
         end
 
