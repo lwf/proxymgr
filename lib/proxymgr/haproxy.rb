@@ -18,7 +18,7 @@ module ProxyMgr
       @global_config    = opts[:global]
       @defaults_config  = opts[:defaults]
 
-      @socket           = @socket ? Socket.new(opts[:socket]) : nil
+      @socket           = @socket_path ? Socket.new(@socket_path) : nil
       @config_template  = ERB.new(File.read(File.join(ProxyMgr.template_dir, 'haproxy.cfg.erb')))
 
       @process          = nil
@@ -74,7 +74,7 @@ module ProxyMgr
     end
 
     def socket?
-      @socket and File.exists? @socket.path
+      @socket
     end
 
     def servers
