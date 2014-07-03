@@ -39,8 +39,8 @@ module ProxyMgr
 
       @thread = Thread.new do
         stop = false
-        until stop
-          fdset = [stdout_read, stderr_read]
+        fdset = [stdout_read, stderr_read]
+        while not stop
           r, w, e = IO.select(fdset, [], fdset)
           out = {}
           r.each do |pipe|
@@ -48,14 +48,16 @@ module ProxyMgr
             buf = out[stream] ||= ""
             begin
               loop { buf << pipe.read_nonblock(4096) }
-            rescue Errno::EWOULDBLOCK, EOFError
+            rescue Errno::EWOULDBLOCK
+            rescue EOFError
+              stop = true
             end
-            stop = pipe.eof?
           end
           out.each do |stream, buf|
             buf.split(/\n/).each { |line| call("on_#{stream}".to_sym, line) }
           end
         end
+        fdset.each(&:close)
       end
       @thread.abort_on_exception = true
 
@@ -70,7 +72,6 @@ module ProxyMgr
         Process.kill("KILL", @pid)
       end
       if @thread
-        @thread.kill
         @thread.join
       end
     end
