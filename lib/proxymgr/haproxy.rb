@@ -78,19 +78,18 @@ module ProxyMgr
     end
 
     def servers
-      stats.inject([]) do |acc, stat|
-        unless ["FRONTEND", "BACKEND"].include? stat["svname"]
+      stats.each_with_object([]) do |stat, acc|
+        unless ['FRONTEND', 'BACKEND'].include? stat['svname']
           acc << Server.new(self, stat)
         end
-        acc
       end
     end
 
     def stats
       headers, *rest = @socket.write("show stat")
-      headers = headers.gsub(/^# /, '').split(",")
+      headers = headers.gsub(/^# /, '').split(',')
       rest.pop
-      rest.map { |d| Hash[headers.zip(d.split(","))] }
+      rest.map { |d| Hash[headers.zip(d.split(','))] }
     end
 
     def enable(backend, host)
@@ -122,9 +121,10 @@ module ProxyMgr
     end
 
     def parse_haproxy_log(line)
-      if matches = line.scan(/^\[(.*)\] (.*)/)[0]
+      matches = line.scan(/^\[(.*)\] (.*)/)[0]
+      if matches
         haproxy_level, msg = matches
-        level = haproxy_level == "WARNING" ? :warn : :info
+        level = haproxy_level == 'WARNING' ? :warn : :info
         logger.send(level, msg)
       else
         logger.info(line)
@@ -142,7 +142,7 @@ module ProxyMgr
 
       def write(cmd)
         with do |socket|
-          socket.puts(cmd + "\n")
+          socket.puts(cmd + '\n')
           socket.readlines.map(&:chomp)
         end
       end
@@ -179,7 +179,7 @@ module ProxyMgr
       end
 
       def disabled?
-        @stats['status'] == "MAINT"
+        @stats['status'] == 'MAINT'
       end
     end
   end

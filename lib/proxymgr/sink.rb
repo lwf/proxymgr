@@ -69,7 +69,7 @@ module ProxyMgr
             @timeout = @timeout ? @timeout * @timeout : @default_timeout
             @timeout = @max_timeout if @timeout > @max_timeout
 
-            logger.debug "Waiting for #{@timeout.to_s}s or signal"
+            logger.debug "Waiting for #{@timeout}s or signal"
           end
 
           t1 = AbsoluteTime.now
@@ -88,22 +88,22 @@ module ProxyMgr
       @mutex.synchronize { @cv.wait(@mutex, @timeout) }
     end
 
-
     def find_existing_backends
       if @haproxy.socket?
-        new_state = Hash[@backends.map { |name, watcher| [name, watcher.servers] }]
-        old_state = @haproxy.servers.inject({}) do |servers, server|
+        new_state = Hash[@backends.map do |name, watcher|
+          [name, watcher.servers]
+        end]
+        old_state = @haproxy.servers.each_with_object({}) do |server, servers|
           backend = servers[server.backend] ||= {:disabled => [], :enabled => []}
           if server.disabled?
             backend[:disabled] << server.name
           else
             backend[:enabled] << server.name
           end
-          servers
         end
         restart_needed = new_state.keys.sort != old_state.keys.sort
         changeset = ChangeSet.new(restart_needed, {}, {})
-        new_state.inject(changeset) do |cs, (backend, servers)|
+        new_state.each_with_object(changeset) do |(backend, servers), cs|
           if old_state[backend]
             enabled    = old_state[backend][:enabled]
             to_disable = enabled - servers
@@ -120,7 +120,7 @@ module ProxyMgr
           cs
         end
       else
-        logger.debug "No socket, not doing diffing"
+        logger.debug 'No socket, not doing diffing'
         ChangeSet.new(true, {}, {})
       end
     end

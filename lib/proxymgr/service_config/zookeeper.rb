@@ -9,7 +9,9 @@ module ProxyMgr
         @services = {}
 
         @client     = ZK::Client.new(@config['servers'])
-        @path_cache = ZK::PathCache.new(@client, @config['path'], &method(:watch))
+        @path_cache = ZK::PathCache.new(@client,
+                                        @config['path'],
+                                        &method(:watch))
         @client.connect
       end
 

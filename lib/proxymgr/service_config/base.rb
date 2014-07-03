@@ -9,7 +9,7 @@ module ProxyMgr
       end
 
       def start
-        raise Exception.new "Should be overridden"
+        raise Exception.new 'Should be overridden'
       end
     end
   end

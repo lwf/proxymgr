@@ -20,12 +20,12 @@ module ProxyMgr
           return
         end
 
-        unless !@listen_options or @listen_options.is_a? Array
+        unless !@listen_options || @listen_options.is_a?(Array)
           warn 'listen_options is not an array'
           return
         end
 
-        unless !@server_options or @server_options.is_a? Array
+        unless !@server_options || @server_options.is_a?(Array)
           warn 'server_options is not an array'
           return
         end
@@ -34,7 +34,7 @@ module ProxyMgr
       end
 
       def watch
-        raise Exception.new "This method should be overridden"
+        raise Exception.new 'This method should be overridden'
       end
 
       def shutdown; end

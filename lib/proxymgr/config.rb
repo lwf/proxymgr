@@ -49,12 +49,11 @@ module ProxyMgr
     private
 
     def interpolate_variables(data)
-      data.gsub(/\{\{\s+?(.*)\s+?\}\}/) do |v| 
-        if e = ENV[$1]
-          e
-        else
+      data.gsub(/\{\{\s+?(.*)\s+?\}\}/) do |v|
+        unless ENV[$1]
           raise ConfigException.new "Environment variable #{$1} is not set"
         end
+        ENV[$1]
       end
     end
 
@@ -78,9 +77,7 @@ module ProxyMgr
 
     def validate_hash(data, validators)
       data.each do |key, value|
-        if v = validators[key]
-          Validators.send(v, key, value)
-        end
+        Validators.send(validators[key], key, value) if validators[key]
       end
     end
 
@@ -95,14 +92,16 @@ module ProxyMgr
             if exe =~ /^\//
               File.executable? exe
             else
-              ENV['PATH'].split(':').find { |e| File.executable? File.join(e, exe) }
+              ENV['PATH'].split(':').find do |e|
+                File.executable? File.join(e, exe)
+              end
             end
           end
         end
 
         def array_of_strings(key, ary)
           ary.each_with_index do |value, i|
-            should("#{key}[#{i.to_s}] should be a string") do
+            should("#{key}[#{i}] should be a string") do
               value.is_a? String
             end
           end
@@ -111,9 +110,7 @@ module ProxyMgr
         private
 
         def should(reason = nil, &blk)
-          unless blk.call
-            raise ConfigException.new(reason)
-          end
+          raise ConfigException.new(reason) unless blk.call
         end
       end
     end

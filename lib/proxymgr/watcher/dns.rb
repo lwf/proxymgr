@@ -11,7 +11,7 @@ module ProxyMgr
             hosts = []
             @config['backends'].map do |backend|
               resolver.each_address(backend['name']) do |addr|
-                hosts << "#{addr.to_s}:#{backend['port']}"
+                hosts << "#{addr}:#{backend['port']}"
               end
             end
 

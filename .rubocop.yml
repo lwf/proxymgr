@@ -1,0 +1,11 @@
+Style/Documentation:
+  Enabled: false
+
+Lint/HandleExceptions:
+  Enabled: false
+
+Lint/RescueException:
+  Enabled: false
+
+Style/HashSyntax:
+  Enabled: false
