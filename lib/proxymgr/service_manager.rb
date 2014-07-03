@@ -6,29 +6,46 @@ module ProxyMgr
       @services = {}
       @sink     = sink
 
-      @mutex    = Monitor.new
+      @service_mutex = Mutex.new
+      @sink_mutex    = Mutex.new
     end
 
-    def update_service(service, data)
-      logger.info "Received updated service: #{service}, #{data.inspect}"
-    end
-
-    def add_service(name, config)
+    def update_service(name, config)
       logger.info "Received service: #{name}"
 
-      @services[name].shutdown if @services[name]
+      type = config.delete('type')
+      begin
+        klass           = watcher_class(type)
+        @service_mutex.synchronize do
+          @services[name].shutdown if @services[name]
+          @services[name] = klass.new(name, config, self)
+        end
+      rescue NameError
+        logger.warn "Could not find implementation for #{type}. Not adding service #{name}"
+      end
+    end
 
-      klass           = Watcher.const_get(config['type'].capitalize)
-      @services[name] = klass.new(name, config, self)
+    def delete_service(name)
+      @service_mutex.synchronize do
+        svc = @services.delete(name)
+        svc.shutdown
+      end
+      update_backends
     end
 
     def update_backends
-      @mutex.synchronize { @sink.update_backends @services }
+      @sink_mutex.synchronize { @sink.update_backends @services }
     end
 
     def shutdown
       @sink.shutdown
       @services.each { |name, watcher| watcher.shutdown }
+    end
+
+    private
+
+    def watcher_class(type)
+      Watcher.const_get(type.capitalize)
     end
   end
 end

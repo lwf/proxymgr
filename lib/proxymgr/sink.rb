@@ -111,8 +111,8 @@ module ProxyMgr
         changeset = ChangeSet.new(restart_needed, {}, {})
         new_state.inject(changeset) do |cs, (backend, servers)|
           if old_state[backend]
-            enabled    = Set.new(old_state[backend][:enabled])
-            to_disable = enabled.difference(servers)
+            enabled    = old_state[backend][:enabled]
+            to_disable = enabled - servers
 
             disabled  = old_state[backend][:disabled]
             to_enable = (disabled & servers)
@@ -126,6 +126,7 @@ module ProxyMgr
           cs
         end
       else
+        logger.debug "No socket, not doing diffing"
         ChangeSet.new(true, {}, {})
       end
     end

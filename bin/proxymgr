@@ -48,7 +48,8 @@ service_manager   = nil
 begin
   sink            = ProxyMgr::Sink.new(haproxy)
   service_manager = ProxyMgr::ServiceManager.new(sink)
-  service_config  = ProxyMgr::ServiceConfig.new(service_manager)
+  service_config  = ProxyMgr::ServiceConfig.create(service_manager,
+                                                   config['service_config'])
 
   [:INT, :TERM].each do |sig|
     Signal.trap(sig) do 
@@ -59,7 +60,7 @@ begin
 
   sleep
 rescue SystemExit
-rescue Exception => e
+rescue NameError, Exception => e
   service_manager.shutdown if service_manager
   raise e
 end

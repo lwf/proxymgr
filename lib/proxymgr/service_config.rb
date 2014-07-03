@@ -1,15 +1,12 @@
 module ProxyMgr
-  class ServiceConfig
-    def initialize(manager)
-      @manager = manager
-      @manager.add_service("test_service", {"port" => 8080,
-                                               "type" => "dns",
-                                               "backends" => [{"name" => "google.com",
-                                                               "port" => "80"}]})
-      #@manager.add_service("test_service2",  {"path" => "/campanja/elastic/basic_vpc",
-                                              #"port" => 8003,
-                                              #"server" => "localhost:2181",
-                                              #"type" => "campanjazk"})
+  module ServiceConfig
+    require 'proxymgr/service_config/base'
+    require 'proxymgr/service_config/zookeeper'
+
+    def self.create(manager, config)
+      type = config.delete('type')
+      impl = ServiceConfig.const_get(type.capitalize)
+      impl.new(manager, config)
     end
   end
 end
