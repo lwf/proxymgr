@@ -1,7 +1,7 @@
 module ProxyMgr
   module ServiceConfig
     class Zookeeper < Base
-      require 'json'
+      require 'yajl/json_gem'
 
       include Logging
 

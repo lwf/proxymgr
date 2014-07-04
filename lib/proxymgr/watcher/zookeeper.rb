@@ -1,7 +1,7 @@
 module ProxyMgr
   module Watcher
     class Zookeeper < Base
-      require 'json'
+      require 'yajl/json_gem'
 
       def watch
         @zookeeper  = ZK::Client.new(@config['server'])
