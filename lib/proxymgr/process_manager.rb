@@ -40,12 +40,12 @@ module ProxyMgr
       @thread = Thread.new do
         stop = false
         fdset = [stdout_read, stderr_read]
-        while not stop
-          r, w, e = IO.select(fdset, [], fdset)
+        until stop
+          r = IO.select(fdset, [], fdset).first
           out = {}
           r.each do |pipe|
             stream = pipe == stdout_read ? :stdout : :stderr
-            buf = out[stream] ||= ""
+            buf = out[stream] ||= ''
             begin
               loop { buf << pipe.read_nonblock(4096) }
             rescue Errno::EWOULDBLOCK
@@ -65,23 +65,19 @@ module ProxyMgr
     end
 
     def stop
-      Process.kill("TERM", @pid)
+      Process.kill('TERM', @pid)
       begin
         Timeout.timeout(@timeout) { wait }
       rescue Timeout::Error
-        Process.kill("KILL", @pid)
+        Process.kill('KILL', @pid)
       end
-      if @thread
-        @thread.join
-      end
+      @thread.join if @thread
     end
 
     def wait
-      begin
-        pid, result = Process.waitpid2 @pid
-        @exit_code = result.exitstatus || result.termsig
-      rescue Errno::ECHILD
-      end
+      pid, result = Process.waitpid2 @pid
+      @exit_code = result.exitstatus || result.termsig
+    rescue Errno::ECHILD
     end
   end
 end

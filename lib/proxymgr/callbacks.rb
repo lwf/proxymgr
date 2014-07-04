@@ -1,9 +1,8 @@
 module ProxyMgr
   module Callbacks
     def call(callback, *args)
-      if cb = @callbacks[callback]
-        cb.call *args
-      end
+      cb = @callbacks[callback]
+      cb.call(*args) if cb
     end
 
     private

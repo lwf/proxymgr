@@ -49,11 +49,11 @@ module ProxyMgr
     private
 
     def interpolate_variables(data)
-      data.gsub(/\{\{\s+?(.*)\s+?\}\}/) do |v|
-        unless ENV[$1]
-          raise ConfigException.new "Environment variable #{$1} is not set"
+      data.gsub(/\{\{\s+?(.*)\s+?\}\}/) do |_v|
+        unless ENV[Regexp.last_match[1]]
+          fail ConfigException "Environment variable #{Regexp.last_match[1]} is not set"
         end
-        ENV[$1]
+        ENV[Regexp.last_match[1]]
       end
     end
 
@@ -110,7 +110,7 @@ module ProxyMgr
         private
 
         def should(reason = nil, &blk)
-          raise ConfigException.new(reason) unless blk.call
+          fail ConfigException.new(reason) unless blk.call
         end
       end
     end

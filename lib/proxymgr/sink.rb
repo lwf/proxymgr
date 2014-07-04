@@ -66,9 +66,7 @@ module ProxyMgr
               @backends = nil
             end
           elsif t1
-            @timeout = @timeout ? @timeout * @timeout : @default_timeout
-            @timeout = @max_timeout if @timeout > @max_timeout
-
+            set_timeout
             logger.debug "Waiting for #{@timeout}s or signal"
           end
 
@@ -88,13 +86,18 @@ module ProxyMgr
       @mutex.synchronize { @cv.wait(@mutex, @timeout) }
     end
 
+    def set_timeout
+      @timeout = @timeout ? @timeout * @timeout : @default_timeout
+      @timeout = @max_timeout if @timeout > @max_timeout
+    end
+
     def find_existing_backends
       if @haproxy.socket?
         new_state = Hash[@backends.map do |name, watcher|
           [name, watcher.servers]
         end]
         old_state = @haproxy.servers.each_with_object({}) do |server, servers|
-          backend = servers[server.backend] ||= {:disabled => [], :enabled => []}
+          backend = servers[server.backend] ||= { :disabled => [], :enabled => [] }
           if server.disabled?
             backend[:disabled] << server.name
           else

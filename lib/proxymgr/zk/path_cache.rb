@@ -9,15 +9,15 @@ module ProxyMgr
         @watcher  = nil
         @path     = path
         @callback = callback
-        @client.on_connected do |event|
+        @client.on_connected do |_event|
           if @sleep
             logger.debug "Sleeping for #{@sleep}s to avoid thundering herd"
             sleep(@sleep) if @sleep
           end
           watch_paths
         end
-        @client.on_expired do |event|
-          @watches.each { |path, watcher| watcher.shutdown }
+        @client.on_expired do |_event|
+          @watches.each { |_path, watcher| watcher.shutdown }
           @watches = {}
           @sleep   = rand(10)
         end
@@ -29,7 +29,7 @@ module ProxyMgr
       private
 
       def watch_paths
-        watcher = lambda do |wpath, type, req|
+        watcher = lambda do |_wpath, type, req|
           if type == :update
             update_watches(req[:children]) if req[:rc] == Zookeeper::ZOK
           else
@@ -44,12 +44,12 @@ module ProxyMgr
       def update_watches(children)
         paths = children.map { |child| File.join(@path, child) }
         (paths - @watches.keys).each do |path|
-          w = @watches[path] = Watcher.new(@client, path, &@callback)
+          @watches[path] = Watcher.new(@client, path, &@callback)
         end
         (@watches.keys - paths).each do |path|
           @watches.delete(path).shutdown
         end
-        @watches.each { |name, watcher| watcher.watch }
+        @watches.each { |_name, watcher| watcher.watch }
       end
 
       class Watcher
@@ -75,7 +75,7 @@ module ProxyMgr
 
           state :shutdown do
             def call(type, data = nil)
-              puts "delayed call #{type.to_s}: #{data.inspect}"
+              puts "delayed call #{type}: #{data.inspect}"
               logger.debug "Received call request, but in shutdown so not doing anything: #{@path}"
             end
           end
@@ -98,9 +98,7 @@ module ProxyMgr
 
         def set_watch
           watcher = Zookeeper::Callbacks::WatcherCallback.create do |event|
-            if event.type != Zookeeper::ZOO_SESSION_EVENT
-              set_watch
-            end
+            set_watch if event.type != Zookeeper::ZOO_SESSION_EVENT
           end
           begin
             req = @client.send(@zk_call, :path => @path, :watcher => watcher)

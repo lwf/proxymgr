@@ -14,17 +14,17 @@ module ProxyMgr
       end
 
       def connect
-        logger.debug "Connect to ZK"
+        logger.debug 'Connect to ZK'
         watcher = lambda do |event|
           case event[:state]
           when ::Zookeeper::ZOO_CONNECTED_STATE
-            logger.debug "Received connected state"
+            logger.debug 'Received connected state'
             call(:on_connected)
           when ::Zookeeper::ZOO_CONNECTING_STATE
-            logger.debug "Received connecting state"
+            logger.debug 'Received connecting state'
             call(:on_disconnected)
           when ::Zookeeper::ZOO_EXPIRED_SESSION_STATE
-            logger.debug "Received expired state"
+            logger.debug 'Received expired state'
             call(:on_expired)
             reopen
           end
@@ -33,7 +33,7 @@ module ProxyMgr
       end
 
       def reopen
-        logger.debug "reopen it"
+        logger.debug 'reopen it'
         @zookeeper.reopen
       end
 
@@ -55,7 +55,7 @@ module ProxyMgr
       end
 
       def method_missing(sym, *args, &blk)
-        logger.debug "Call to zookeeper #{sym.to_s}: #{args.map(&:to_s).join(',')}"
+        logger.debug "Call to zookeeper #{sym}: #{args.map(&:to_s).join(',')}"
         @zookeeper.send(sym, *args, &blk)
       end
 
@@ -85,18 +85,17 @@ module ProxyMgr
         when ::Zookeeper::ZOK
           logger.debug "Now watching #{wait_path}"
         when ::Zookeeper::ZNONODE
-          logger.debug "Re-resolving paths"
+          logger.debug 'Re-resolving paths'
           wait_path, rest = find_wait_path(complete_path)
           wait_for_path(complete_path, wait_path, rest, &blk)
         else
-          logger.warn "wait_for_path #{wait_path} failed: #{req[:rc].to_s}"
+          logger.warn "wait_for_path #{wait_path} failed: #{req[:rc]}"
         end
       end
 
       def find_wait_path(complete_path)
         parts = split(complete_path)
         rest = [parts.pop]
-        path = '/'
         until parts.empty?
           path = join(*parts)
           if @zookeeper.get(:path => path)[:rc] == ::Zookeeper::ZOK
@@ -109,15 +108,15 @@ module ProxyMgr
 
       def join(*path)
         p = ::File.join(*path)
-        if p == ""
-          "/"
+        if p == ''
+          '/'
         else
           p
         end
       end
 
       def split(path)
-        head, *tail = path.split("/")
+        head, *tail = path.split('/')
         [head] + tail.reject(&:empty?)
       end
     end

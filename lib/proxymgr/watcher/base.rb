@@ -34,7 +34,7 @@ module ProxyMgr
       end
 
       def watch
-        raise Exception.new 'This method should be overridden'
+        fail Exception 'This method should be overridden'
       end
 
       def shutdown; end

@@ -39,7 +39,7 @@ module ProxyMgr
 
     def shutdown
       @sink.shutdown
-      @services.each { |name, watcher| watcher.shutdown }
+      @services.each { |_name, watcher| watcher.shutdown }
     end
 
     private

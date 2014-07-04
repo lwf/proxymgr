@@ -36,7 +36,7 @@ module ProxyMgr
       @thread = Thread.new do
         loop do
           @mutex.synchronize do
-            if @process and ret = @process.exit_code and ret > 0 and ret != 15
+            if @process && ret = @process.exit_code && ret > 0 && ret != 15
               logger.warn "haproxy exited with status code #{ret}. Respawning in #{@respawn_interval}s"
               sleep @respawn_interval
               run
@@ -79,14 +79,13 @@ module ProxyMgr
 
     def servers
       stats.each_with_object([]) do |stat, acc|
-        unless ['FRONTEND', 'BACKEND'].include? stat['svname']
-          acc << Server.new(self, stat)
-        end
+        next if %w(FRONTEND BACKEND).include? stat['svname']
+        acc << Server.new(self, stat)
       end
     end
 
     def stats
-      headers, *rest = @socket.write("show stat")
+      headers, *rest = @socket.write('show stat')
       headers = headers.gsub(/^# /, '').split(',')
       rest.pop
       rest.map { |d| Hash[headers.zip(d.split(','))] }
