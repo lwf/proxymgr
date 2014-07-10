@@ -36,7 +36,7 @@ module ProxyMgr
       @thread = Thread.new do
         loop do
           @mutex.synchronize do
-            if @process && ret = @process.exit_code && ret > 0 && ret != 15
+            if @process.running? && ret = @process.exit_code && ret > 0 && ret != 15
               logger.warn "haproxy exited with status code #{ret}. Respawning in #{@respawn_interval}s"
               sleep @respawn_interval
               run
@@ -74,7 +74,7 @@ module ProxyMgr
     end
 
     def socket?
-      @socket
+      @socket and @process.running?
     end
 
     def servers

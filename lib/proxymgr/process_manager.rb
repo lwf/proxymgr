@@ -34,6 +34,7 @@ module ProxyMgr
         end
         Process.exec *([@cmd] + @args)
       end
+      @running = true
 
       [stdout_write, stderr_write].each(&:close)
 
@@ -64,6 +65,13 @@ module ProxyMgr
       @pid
     end
 
+    def running?
+      if @pid
+        wait(true)
+        @running
+      end
+    end
+
     def stop
       Process.kill('TERM', @pid)
       begin
@@ -74,10 +82,17 @@ module ProxyMgr
       @thread.join if @thread
     end
 
-    def wait
-      pid, result = Process.waitpid2 @pid
-      @exit_code = result.exitstatus || result.termsig
-    rescue Errno::ECHILD
+    def wait(nohang = false)
+      flags = nohang ? Process::WNOHANG : 0
+      begin
+        pid, result = Process.waitpid2(@pid, flags)
+        if nohang and pid.nil? and result.nil?
+          return
+        end
+        @exit_code = result.exitstatus || result.termsig
+      rescue Errno::ECHILD
+      end
+      @running = false
     end
   end
 end

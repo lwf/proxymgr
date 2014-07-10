@@ -8,7 +8,7 @@ module ProxyMgr
     def initialize(haproxy, opts = {})
       @file            = opts[:haproxy_config_file] || '/tmp/haproxy.cfg'
       @default_timeout = opts[:default_timeout] || 2
-      @max_timeout     = opts[:max_timeout] || 20
+      @max_timeout     = opts[:max_timeout] || 10
       @haproxy         = haproxy
       @timeout         = nil
       @thread          = nil
