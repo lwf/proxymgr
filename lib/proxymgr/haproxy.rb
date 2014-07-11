@@ -6,6 +6,8 @@ module ProxyMgr
     require 'pathname'
     require 'erb'
     require 'proxymgr/process_manager'
+    require 'proxymgr/haproxy/socket'
+    require 'proxymgr/haproxy/server'
 
     include Logging
 
@@ -129,58 +131,6 @@ module ProxyMgr
         logger.send(level, msg)
       else
         logger.info(line)
-      end
-    end
-
-    class Socket
-      require 'socket'
-
-      attr_reader :path
-
-      def initialize(path)
-        @path = path
-      end
-
-      def write(cmd)
-        with do |socket|
-          socket.puts(cmd + '\n')
-          socket.readlines.map(&:chomp)
-        end
-      end
-
-      private
-
-      def with
-        yield UNIXSocket.new(@path)
-      end
-    end
-
-    class Server
-      attr_reader :stats
-
-      def initialize(haproxy, stats)
-        @haproxy = haproxy
-        @stats   = stats
-      end
-
-      def backend
-        @stats['pxname']
-      end
-
-      def name
-        @stats['svname']
-      end
-
-      def disable
-        @haproxy.disable backend, name
-      end
-
-      def shutdown
-        @haproxy.shutdown backend, name
-      end
-
-      def disabled?
-        @stats['status'] == 'MAINT'
       end
     end
   end
