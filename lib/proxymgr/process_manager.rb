@@ -1,6 +1,7 @@
 module ProxyMgr
   class ProcessManager
     require 'timeout'
+    require 'proxymgr/process_manager/signal_handler'
 
     include Callbacks
 
@@ -17,12 +18,13 @@ module ProxyMgr
 
       @io_handler = nil
 
-      callbacks :on_stdout, :on_stderr
+      callbacks :on_stdout, :on_stderr, :on_stop
     end
 
     def start
       stdout_read, stdout_write = IO.pipe
       stderr_read, stderr_write = IO.pipe
+      sync_pipe                 = IO.pipe
 
       @pid = Process.fork do
         $stdout.reopen stdout_write
@@ -32,9 +34,12 @@ module ProxyMgr
           Process.setsid if @setsid
         rescue Errno::EPERM
         end
+        sync_pipe[0].read(1)
         Process.exec *([@cmd] + @args)
       end
-      [stdout_write, stderr_write].each(&:close)
+      self.class.register(@pid) { |status| call(:on_stop, status) }
+      sync_pipe[1].write(1)
+      ([stdout_write, stderr_write] + sync_pipe).each(&:close)
 
       @thread = Thread.new do
         stop = false
@@ -79,6 +84,11 @@ module ProxyMgr
         @exit_code = result.exitstatus || result.termsig
       rescue Errno::ECHILD
       end
+    end
+
+    def self.register(pid, &blk)
+      @handler ||= SignalHandler.new
+      @handler.register(pid, &blk)
     end
   end
 end

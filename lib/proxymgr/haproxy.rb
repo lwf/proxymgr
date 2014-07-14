@@ -8,6 +8,8 @@ module ProxyMgr
     require 'proxymgr/process_manager'
     require 'proxymgr/haproxy/socket'
     require 'proxymgr/haproxy/server'
+    require 'proxymgr/haproxy/process'
+    require 'proxymgr/haproxy/state'
 
     include Logging
 
@@ -16,16 +18,12 @@ module ProxyMgr
       @config_file      = config_file
 
       @socket_path      = opts[:socket]
-      @respawn_interval = opts[:respawn_interval] || 5
       @global_config    = opts[:global]
       @defaults_config  = opts[:defaults]
 
       @socket           = @socket_path ? Socket.new(@socket_path) : nil
-      @config_template  = ERB.new(File.read(File.join(ProxyMgr.template_dir, 'haproxy.cfg.erb')))
 
       @process          = nil
-      @thread           = nil
-      @mutex            = Mutex.new
     end
 
     def version
@@ -33,104 +31,67 @@ module ProxyMgr
     end
 
     def start
-      run
+      @socket  = @socket_path ? Socket.new(@socket_path) : nil
+      @process = Process.new(@path, @config_file)
+      opts     = {:defaults    => @defaults_config,
+                  :global      => @global_config,
+                  :socket_path => @socket_path}
+      @state   = State.new(@process, @config_file, @socket, opts)
 
-      @thread = Thread.new do
-        loop do
-          @process.wait
-
-          @mutex.synchronize do
-            ret = @process.exit_code
-            if ret > 0 && ret != 15
-              logger.warn "haproxy exited with status code #{ret}. Respawning in #{@respawn_interval}s"
-              sleep @respawn_interval
-              run
-            end
-          end
-        end
-      end
-      @thread.abort_on_exception = true
+      @state.start
     end
 
-    def write_config(backends)
-      f = nil
-      begin
-        f = Tempfile.new('haproxy')
-        f.write @config_template.result(binding)
-        f.close
-        Pathname.new(f.path).rename(@config_file)
-      rescue Exception => e
-        logger.warn "Unable to write to #{@config_file}: #{e}"
-        File.unlink f.path if f
-      end
+    def shutdown
+      @state.stop
     end
 
-    def restart
-      @mutex.synchronize { run(@process.pid) }
-    end
-
-    def stop
-      @mutex.synchronize do
-        @thread.kill
-        @thread.join
-        @process.stop
-      end
-    end
-
-    def socket?
-      @socket and @process.running?
-    end
-
-    def servers
-      stats.each_with_object([]) do |stat, acc|
-        next if %w(FRONTEND BACKEND).include? stat['svname']
-        acc << Server.new(self, stat)
-      end
-    end
-
-    def stats
-      headers, *rest = @socket.write('show stat')
-      headers = headers.gsub(/^# /, '').split(',')
-      rest.pop
-      rest.map { |d| Hash[headers.zip(d.split(','))] }
-    end
-
-    def enable(backend, host)
-      @socket.write "enable server #{backend}/#{host}"
-    end
-
-    def disable(backend, host)
-      @socket.write "disable server #{backend}/#{host}"
-    end
-
-    def shutdown(backend, host)
-      @socket.write "shutdown sessions server #{backend}/#{host}"
+    def update_backends(watchers)
+      changeset = find_existing_backends(watchers)
+      @state.update_state(watchers, changeset)
     end
 
     private
 
-    def run(pid = nil)
-      args = ['-f', @config_file, '-db']
-      if pid
-        args << '-sf'
-        args << pid.to_s
-      end
+    def find_existing_backends(watchers)
+      if @socket and @socket.connected?
+        new_state = Hash[watchers.map do |name, watcher|
+          [name, watcher.servers]
+        end]
+        old_state = @socket.servers.each_with_object({}) do |server, servers|
+          backend = servers[server.backend] ||= { :disabled => [], :enabled => [] }
+          if server.disabled?
+            backend[:disabled] << server.name
+          else
+            backend[:enabled] << server.name
+          end
+        end
+        restart_needed = new_state.keys.sort != old_state.keys.sort
+        changeset = ChangeSet.new(restart_needed, {}, {})
+        new_state.each_with_object(changeset) do |(backend, servers), cs|
+        if old_state[backend]
+          enabled    = old_state[backend][:enabled]
+          to_disable = enabled - servers
 
-      @process = ProcessManager.new(@path, args)
-      [:on_stdout, :on_stderr].each do |cb|
-        @process.send(cb, &method(:parse_haproxy_log))
+          disabled  = old_state[backend][:disabled]
+          to_enable = (disabled & servers)
+          if ((enabled - to_disable) + to_enable).sort != servers.sort
+            cs.restart_needed = true
+          end
+
+          cs.disable[backend] = to_disable
+          cs.enable[backend]  = to_enable
+        end
+        cs
+        end
+      else
+        logger.debug 'No socket, not doing diffing'
+        ChangeSet.new(true, {}, {})
       end
-      @process.start
     end
 
-    def parse_haproxy_log(line)
-      matches = line.scan(/^\[(.*)\] (.*)/)[0]
-      if matches
-        haproxy_level, msg = matches
-        level = haproxy_level == 'WARNING' ? :warn : :info
-        logger.send(level, msg)
-      else
-        logger.info(line)
+    class ChangeSet < Struct.new(:restart_needed, :disable, :enable)
+      def restart_needed?
+        restart_needed
       end
     end
   end

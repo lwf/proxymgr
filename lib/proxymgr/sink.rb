@@ -20,7 +20,6 @@ module ProxyMgr
     end
 
     def update_backends(backends)
-      logger.debug 'Received new backends'
       @mutex.synchronize do
         @backends ||= {}
         backends.each do |name, watcher|
@@ -34,7 +33,7 @@ module ProxyMgr
     def shutdown
       @thread.kill
       @thread.join
-      @haproxy.stop
+      @haproxy.shutdown
     end
 
     private
@@ -45,22 +44,7 @@ module ProxyMgr
         loop do
           if @timeout && t1 && AbsoluteTime.now - t1 >= @timeout && @backends
             @mutex.synchronize do
-              changeset = find_existing_backends
-
-              changeset.disable.each do |backend, hosts|
-                hosts.each { |host| @haproxy.disable backend, host }
-              end
-
-              changeset.enable.each do |backend, hosts|
-                hosts.each { |host| @haproxy.enable backend, host }
-              end
-
-              @haproxy.write_config(@backends)
-
-              if changeset.restart_needed?
-                logger.info 'Signaling haproxy to restart'
-                @haproxy.restart
-              end
+              @haproxy.update_backends(@backends)
 
               @timeout = nil
               @backends = nil
@@ -89,49 +73,6 @@ module ProxyMgr
     def set_timeout
       @timeout = @timeout ? @timeout * @timeout : @default_timeout
       @timeout = @max_timeout if @timeout > @max_timeout
-    end
-
-    def find_existing_backends
-      if @haproxy.socket?
-        new_state = Hash[@backends.map do |name, watcher|
-          [name, watcher.servers]
-        end]
-        old_state = @haproxy.servers.each_with_object({}) do |server, servers|
-          backend = servers[server.backend] ||= { :disabled => [], :enabled => [] }
-          if server.disabled?
-            backend[:disabled] << server.name
-          else
-            backend[:enabled] << server.name
-          end
-        end
-        restart_needed = new_state.keys.sort != old_state.keys.sort
-        changeset = ChangeSet.new(restart_needed, {}, {})
-        new_state.each_with_object(changeset) do |(backend, servers), cs|
-          if old_state[backend]
-            enabled    = old_state[backend][:enabled]
-            to_disable = enabled - servers
-
-            disabled  = old_state[backend][:disabled]
-            to_enable = (disabled & servers)
-            if ((enabled - to_disable) + to_enable).sort != servers.sort
-              cs.restart_needed = true
-            end
-
-            cs.disable[backend] = to_disable
-            cs.enable[backend]  = to_enable
-          end
-          cs
-        end
-      else
-        logger.debug 'No socket, not doing diffing'
-        ChangeSet.new(true, {}, {})
-      end
-    end
-
-    class ChangeSet < Struct.new(:restart_needed, :disable, :enable)
-      def restart_needed?
-        restart_needed
-      end
     end
   end
 end
