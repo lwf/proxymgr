@@ -1,19 +1,11 @@
 module ProxyMgr
   class Haproxy
-    require 'thread'
-    require 'zlib'
-    require 'tempfile'
-    require 'pathname'
-    require 'erb'
-    require 'proxymgr/process_manager'
     require 'proxymgr/haproxy/socket'
     require 'proxymgr/haproxy/updater'
     require 'proxymgr/haproxy/server'
     require 'proxymgr/haproxy/control'
     require 'proxymgr/haproxy/process'
     require 'proxymgr/haproxy/state'
-
-    include Logging
 
     def initialize(path, config_file, opts = {})
       @path             = path
