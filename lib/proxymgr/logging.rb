@@ -1,6 +1,7 @@
 module ProxyMgr
   module Logging
     require 'logger'
+    require 'stringio'
 
     def logger
       @logger ||= Logging.logger(self.class)
@@ -9,8 +10,13 @@ module ProxyMgr
     class << self
       attr_accessor :level
 
+      def disable!
+        @disable = true
+      end
+
       def logger(name)
-        logger = Logger.new(STDOUT)
+        sink = @disable ? StringIO.new : STDOUT
+        logger = Logger.new(sink)
         logger.level = @level || Logger::INFO
         logger.progname = name
         logger
