@@ -6,30 +6,17 @@ module ProxyMgr
       include Logging
       include Callbacks
 
-      def initialize(servers = 'localhost:2181', opts = {})
+      def initialize(servers = 'localhost:2181', opts = {}, klass = Zookeeper)
         @servers   = servers
         @heartbeat = opts[:heartbeat] || 2000
+        @klass     = klass
 
         callbacks :on_connected, :on_expired, :on_disconnected
       end
 
       def connect
         logger.debug 'Connect to ZK'
-        watcher = lambda do |event|
-          case event[:state]
-          when ::Zookeeper::ZOO_CONNECTED_STATE
-            logger.debug 'Received connected state'
-            call(:on_connected)
-          when ::Zookeeper::ZOO_CONNECTING_STATE
-            logger.debug 'Received connecting state'
-            call(:on_disconnected)
-          when ::Zookeeper::ZOO_EXPIRED_SESSION_STATE
-            logger.debug 'Received expired state'
-            call(:on_expired)
-            reopen
-          end
-        end
-        @zookeeper = ::Zookeeper.new(@servers, @heartbeat, watcher)
+        @zookeeper = @klass.new(@servers, @heartbeat, method(:watcher))
       end
 
       def reopen
@@ -60,6 +47,21 @@ module ProxyMgr
       end
 
       private
+
+      def watcher(event)
+        case event[:state]
+        when ::Zookeeper::ZOO_CONNECTED_STATE
+          logger.debug 'Received connected state'
+          call(:on_connected)
+        when ::Zookeeper::ZOO_CONNECTING_STATE
+          logger.debug 'Received connecting state'
+          call(:on_disconnected)
+        when ::Zookeeper::ZOO_EXPIRED_SESSION_STATE
+          logger.debug 'Received expired state'
+          call(:on_expired)
+          reopen
+        end
+      end
 
       def wait_for_path(complete_path, wait_path, rest = [], &blk)
         cb = ::Zookeeper::Callbacks::WatcherCallback.create do |event|
