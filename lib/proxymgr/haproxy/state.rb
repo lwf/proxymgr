@@ -40,7 +40,7 @@ module ProxyMgr
                 write_config(@backends)
                 @changeset = nil
                 @backends  = nil
-              elsif @process.exit_code > 0 && @process.exit_code != 15
+              elsif @process.exited?
                 sleep_interval = @sleep_interval
                 logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
               end
@@ -54,9 +54,7 @@ module ProxyMgr
         @thread.abort_on_exception = true
 
         @process.on_stop do |status|
-          if status > 0 and status != 15
-            Thread.new { signal }.join
-          end
+          Thread.new { signal }.join if @process.exited?
         end
         @process.start
       end

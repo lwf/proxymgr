@@ -1,60 +1,94 @@
 module ProxyMgr
   class Haproxy
     class Process
-      require 'proxymgr/process_manager'
+      require 'state_machine'
 
       include Logging
-      include Callbacks
 
-      attr_reader :exit_code
+      state_machine :state, :initial => :stopped do
+        event :start do
+          transition [:stopped, :exited] => :running, :if => :run
+        end
 
-      def initialize(path, config_file)
-        @path        = path
-        @config_file = config_file
+        event :exited do
+          transition :running => :exited
+        end
 
-        @mutex       = Mutex.new
+        event :stop do
+          transition :running => :shutdown
+        end
 
-        callbacks :on_stop
-      end
+        after_transition :running => :shutdown do |process|
+          process.stopping
+          process.process_manager.stop
+        end
 
-      def start
-        restart
-      end
+        event :replace do
+          transition :running => :stopping
+        end
 
-      def restart
-        @mutex.synchronize do
-          if @process
-            run(@process.pid)
-          else
-            run
+        event :stopping do
+          transition :shutdown => :stopping
+        end
+
+        event :stopped do
+          transition :stopping => :stopped
+        end
+
+        state :running do
+          def handle_stop(status)
+            @exit_code = status
+            if abnormal_exit?
+              exited
+            else
+              stopped
+            end
+            @callback.call status
+          end
+        end
+
+        state :stopping do
+          def handle_stop(status)
+            @exit_code = status
+            stopped
           end
         end
       end
 
-      [:wait, :stop].each do |sym|
-        define_method(sym) { |*args, &blk| @process.send(sym, *args, &blk) }
+      attr_reader :exit_code, :process_manager
+
+      def initialize(path, config_file, old_pid = nil, &callback)
+        @path        = path
+        @config_file = config_file
+        @old_pid     = old_pid
+        @callback    = callback
+
+        super()
+      end
+
+      [:pid, :wait].each do |sym|
+        define_method(sym) { @process_manager.send(sym) }
       end
 
       private
 
-      def run(pid = nil)
-        args = ['-f', @config_file, '-db']
-        if pid
-          args << '-sf'
-          args << pid.to_s
-        end
-
-        @process = ProcessManager.new(@path, args)
-        [:on_stdout, :on_stderr].each do |cb|
-          @process.send(cb, &method(:parse_haproxy_log))
-        end
-        @process.on_stop(&method(:handle_stop))
-        @process.start
+      def abnormal_exit?
+        @exit_code && @exit_code > 0
       end
 
-      def handle_stop(status)
-        @exit_code = status
-        call(:on_stop, status)
+      def run
+        args = ['-f', @config_file, '-db']
+        if @old_pid
+          args << '-sf'
+          args << @old_pid.to_s
+        end
+
+        @process_manager = ProcessManager.new(@path, args)
+        [:on_stdout, :on_stderr].each do |cb|
+          @process_manager.send(cb, &method(:parse_haproxy_log))
+        end
+        @process_manager.on_stop(&method(:handle_stop))
+        @process_manager.start
       end
 
       def parse_haproxy_log(line)

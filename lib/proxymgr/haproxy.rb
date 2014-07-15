@@ -9,6 +9,7 @@ module ProxyMgr
     require 'proxymgr/haproxy/socket'
     require 'proxymgr/haproxy/updater'
     require 'proxymgr/haproxy/server'
+    require 'proxymgr/haproxy/control'
     require 'proxymgr/haproxy/process'
     require 'proxymgr/haproxy/state'
 
@@ -24,7 +25,7 @@ module ProxyMgr
 
       @socket           = @socket_path ? Socket.new(@socket_path) : nil
 
-      @process          = nil
+      @control          = nil
     end
 
     def version
@@ -33,11 +34,11 @@ module ProxyMgr
 
     def start
       @socket  = @socket_path ? Socket.new(@socket_path) : nil
-      @process = Process.new(@path, @config_file)
+      @control = Control.new(@path, @config_file)
       opts     = {:defaults    => @defaults_config,
                   :global      => @global_config,
                   :socket_path => @socket_path}
-      @state   = State.new(@process, @config_file, @socket, opts)
+      @state   = State.new(@control, @config_file, @socket, opts)
       @updater = Updater.new(@socket)
 
       @state.start
