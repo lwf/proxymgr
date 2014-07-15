@@ -28,7 +28,7 @@ module ProxyMgr
     def delete_service(name)
       @service_mutex.synchronize do
         svc = @services.delete(name)
-        svc.shutdown
+        svc.shutdown if svc
       end
       update_backends
     end
