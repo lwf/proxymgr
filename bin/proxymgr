@@ -5,6 +5,8 @@ require 'proxymgr'
 require 'yaml'
 require 'docopt'
 
+Thread.abort_on_exception = true
+
 opt = <<OPT
 ProxyMgr manages Haproxy dynamically.
 
@@ -53,7 +55,12 @@ begin
 
   [:INT, :TERM].each do |sig|
     Signal.trap(sig) do
-      Thread.new { service_manager.shutdown }.join
+      begin
+        Thread.new { service_manager.shutdown }.join
+      rescue Exception => e
+        p e
+        p e.backtrace
+      end
       exit 0
     end
   end

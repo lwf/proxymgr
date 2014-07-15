@@ -1,5 +1,5 @@
 global
-  <% if @socket_path %>stats socket <%= @socket_path %> mode 666 level admin<% end %>
+  stats socket <%= @socket_path %> mode 666 level admin
 <% @global_config.each do |line| %>  <%= line %>
 <% end %>
 defaults
