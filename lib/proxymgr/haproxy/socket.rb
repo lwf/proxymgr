@@ -54,7 +54,13 @@ module ProxyMgr
       private
 
       def with
-        yield UNIXSocket.new(@path)
+        socket = nil
+        begin
+          socket = UNIXSocket.new(@path)
+          yield socket
+        ensure
+          socket.close if socket
+        end
       end
     end
   end
