@@ -36,7 +36,7 @@ module ProxyMgr
         rescue Errno::EPERM
         end
         sync_pipe[0].read(1)
-        0.upto(max_fds).each do |fd|
+        3.upto(max_fds).each do |fd|
           begin
             IO.for_fd(fd).close unless @fds.include? fd
           rescue ArgumentError, Errno::EBADF
@@ -87,7 +87,7 @@ module ProxyMgr
 
     def wait
       begin
-        pid, result = Process.waitpid2(@pid)
+        _pid, result = Process.waitpid2(@pid)
         @exit_code = result.exitstatus || result.termsig
       rescue Errno::ECHILD
       end
