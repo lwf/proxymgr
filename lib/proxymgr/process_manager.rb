@@ -15,6 +15,7 @@ module ProxyMgr
 
       @timeout    = opts[:timeout] || 10
       @setsid     = opts[:setsid] || true
+      @fds        = opts[:fds] || []
 
       @io_handler = nil
 
@@ -35,7 +36,13 @@ module ProxyMgr
         rescue Errno::EPERM
         end
         sync_pipe[0].read(1)
-        Process.exec *([@cmd] + @args)
+        0.upto(max_fds).each do |fd|
+          begin
+            IO.for_fd(fd).close unless @fds.include? fd
+          rescue ArgumentError, Errno::EBADF
+          end
+        end
+        Process.exec(*([@cmd] + @args), :close_others => false)
       end
       self.class.register(@pid) { |status| call(:on_stop, status) }
       sync_pipe[1].write(1)
@@ -84,6 +91,10 @@ module ProxyMgr
         @exit_code = result.exitstatus || result.termsig
       rescue Errno::ECHILD
       end
+    end
+
+    def max_fds
+      File.readlines('/proc/self/status').find { |x| x =~ /^FDSize:/ }.split(':').last.to_i
     end
 
     def self.register(pid, &blk)

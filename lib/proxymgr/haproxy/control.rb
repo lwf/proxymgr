@@ -18,10 +18,11 @@ module ProxyMgr
         restart
       end
 
-      def restart
+      def restart(fds = [])
+        p fds
         @mutex.synchronize do
           if @process
-            run(@process.pid)
+            run(@process.pid, fds)
           else
             run
           end
@@ -34,9 +35,9 @@ module ProxyMgr
 
       private
 
-      def run(pid = nil)
+      def run(pid = nil, fds = [])
         @process.replace if @process
-        @process = Process.new(@path, @config_file, pid) do |status|
+        @process = Process.new(@path, @config_file, fds, pid) do |status|
           call(:on_stop, status)
         end
         @process.start

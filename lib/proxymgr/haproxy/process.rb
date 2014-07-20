@@ -57,11 +57,12 @@ module ProxyMgr
 
       attr_reader :exit_code, :process_manager
 
-      def initialize(path, config_file, old_pid = nil, &callback)
+      def initialize(path, config_file, fds, old_pid = nil, &callback)
         @path        = path
         @config_file = config_file
         @old_pid     = old_pid
         @callback    = callback
+        @fds         = fds
 
         super()
       end
@@ -83,7 +84,7 @@ module ProxyMgr
           args << @old_pid.to_s
         end
 
-        @process_manager = ProcessManager.new(@path, args)
+        @process_manager = ProcessManager.new(@path, args, :fds => @fds)
         [:on_stdout, :on_stderr].each do |cb|
           @process_manager.send(cb, &method(:parse_haproxy_log))
         end
