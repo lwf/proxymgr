@@ -4,6 +4,8 @@ module ProxyMgr
       require 'socket'
       require 'fcntl'
 
+      include Logging
+
       def initialize
         @sockets = {}
       end
@@ -16,7 +18,8 @@ module ProxyMgr
 
       def update(backends)
         fds = backends.each_with_object({}) do |(name, backend), mapping|
-          mapping[backend.port] = for_port(backend.port).fileno
+          socket = for_port(backend.port)
+          mapping[backend.port] = socket.fileno if socket
         end
 
         (@sockets.keys - fds.keys).each do |port|
@@ -31,7 +34,18 @@ module ProxyMgr
       def for_port(port)
         unless @sockets[port]
           @sockets[port] = ::Socket.new(::Socket::AF_INET, ::Socket::SOCK_STREAM, 0)
-          @sockets[port].bind(::Socket.pack_sockaddr_in(port, '0.0.0.0'))
+          @sockets[port].setsockopt(::Socket::SOL_SOCKET, ::Socket::SO_REUSEADDR, 1)
+          retries = 0
+          until retries > 5
+            begin
+              @sockets[port].bind(::Socket.pack_sockaddr_in(port, '0.0.0.0'))
+              break
+            rescue Errno::EADDRINUSE
+              logger.info "Could not bind to #{port}: retrying..."
+              sleep 1
+              retries += 1
+            end
+          end
           flags = @sockets[port].fcntl(Fcntl::F_GETFD) & ~Fcntl::FD_CLOEXEC
           @sockets[port].fcntl(Fcntl::F_SETFD, flags)
         end
