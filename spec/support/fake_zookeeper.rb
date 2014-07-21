@@ -45,8 +45,9 @@ class FakeZookeeper
     data    = opts[:data]
 
     data = set_path(path, data)
-    fire_watches(path) if data
-    event(data)
+    event = event(data)
+    fire_watches(path, event) if data
+    event
   end
 
   def create(opts)
@@ -59,9 +60,10 @@ class FakeZookeeper
     parent = File.join(*parts)
 
     data = create_path(name, parent, data)
-    fire_watches(parent) if data
+    event = event(data)
+    fire_watches(parent, event) if data
     watch_path(path, watcher) if watcher
-    event(data)
+    event
   end
 
   def get_children(opts)
@@ -86,7 +88,7 @@ class FakeZookeeper
 
   def get_path(path)
     node = resolve_node(path)
-    node[:data] if node
+    (node[:data] || "") if node
   end
 
   def set_path(path, set_data)
@@ -117,7 +119,7 @@ class FakeZookeeper
 
   def get_children_path(path)
     node = resolve_node(path)
-    node[:children].keys if node and node[:children]
+    node[:children] ? node[:children].keys : [] if node
   end
 
   def fire_watches(path, event = nil)
@@ -143,10 +145,18 @@ class FakeZookeeper
   end
 
   def zoo_session_event(state)
-    {:state => state}
+    Event.new.tap do |e|
+      e.state = state
+      e.type  = state
+    end
   end
 
   def event(data, rc = Zookeeper::ZOK)
-    {:data => data, :rc => rc}
+    Event.new.tap do |e|
+      e.data = data
+      e.rc   = rc
+    end
   end
+
+  class Event < Struct.new(:rc, :state, :data, :type); end
 end
