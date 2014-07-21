@@ -6,6 +6,8 @@ module ProxyMgr
 
       include Logging
 
+      attr_reader :sockets
+
       def initialize
         @sockets = {}
       end
