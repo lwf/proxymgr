@@ -25,6 +25,7 @@ describe ProxyMgr::Haproxy::SocketManager, '#update' do
       @sm.sockets[port].should be_kind_of(Socket)
     end
     watchers.delete("service_9090")
+    Socket.any_instance.should_receive(:close)
     @sm.update(watchers)
     @sm.sockets[9091].should be_kind_of(Socket)
     @sm.sockets[9090].should == nil
