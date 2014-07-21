@@ -6,6 +6,7 @@ module ProxyMgr
     require 'proxymgr/haproxy/control'
     require 'proxymgr/haproxy/process'
     require 'proxymgr/haproxy/state'
+    require 'proxymgr/haproxy/socket_manager'
 
     def initialize(path, config_file, opts = {})
       @path             = path
@@ -25,19 +26,21 @@ module ProxyMgr
     end
 
     def start
-      @socket  = @socket_path ? Socket.new(@socket_path) : nil
-      @control = Control.new(@path, @config_file)
-      opts     = {:defaults    => @defaults_config,
-                  :global      => @global_config,
-                  :socket_path => @socket_path}
-      @state   = State.new(@control, @config_file, @socket, opts)
-      @updater = Updater.new(@socket)
+      @socket         = @socket_path ? Socket.new(@socket_path) : nil
+      @control        = Control.new(@path, @config_file)
+      opts            = {:defaults    => @defaults_config,
+                         :global      => @global_config,
+                         :socket_path => @socket_path}
+      @socket_manager = SocketManager.new
+      @state          = State.new(@control, @config_file, @socket_manager, @socket, opts)
+      @updater        = Updater.new(@socket)
 
       @state.start
     end
 
     def shutdown
       @state.stop
+      @socket_manager.shutdown
     end
 
     def update_backends(watchers)

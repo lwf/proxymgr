@@ -7,22 +7,27 @@ module ProxyMgr
 
       include Logging
 
-      def initialize(process, config_file, socket = nil, opts = {})
+      def initialize(process, config_file, socket_manager, socket = nil, opts = {})
         @process         = process
         @config_file     = config_file
         @socket          = socket
+        @socket_manager  = socket_manager
 
         @sleep_interval  = opts[:sleep_interval] || 5
         @global_config   = opts[:global]
         @defaults_config = opts[:defaults]
         @socket_path     = opts[:socket_path]
 
-        @config_template = ERB.new(File.read(File.join(ProxyMgr.template_dir, 'haproxy.cfg.erb')))
-        @mutex           = Mutex.new
-        @cv              = ConditionVariable.new
+        @file_descriptors = {}
+        @backends         = {}
+        @config_template  = ERB.new(File.read(File.join(ProxyMgr.template_dir, 'haproxy.cfg.erb')))
+        @mutex            = Mutex.new
+        @cv               = ConditionVariable.new
       end
 
       def start
+        write_config
+
         @thread = Thread.new do
           loop do
             logger.debug "Waiting..."
@@ -37,7 +42,8 @@ module ProxyMgr
                   update_state_with_changeset
                   restart_needed = @changeset.restart_needed?
                 end
-                write_config(@backends)
+                @file_descriptors = @socket_manager.update(@backends)
+                write_config
                 @changeset = nil
                 @backends  = nil
               elsif @process.exited?
@@ -48,7 +54,7 @@ module ProxyMgr
 
             sleep(sleep_interval) if sleep_interval # TODO: wait
 
-            @process.restart if restart_needed
+            @process.restart(@file_descriptors.values) if restart_needed
           end
         end
         @thread.abort_on_exception = true
@@ -101,7 +107,7 @@ module ProxyMgr
         @mutex.synchronize { @cv.wait(@mutex, timeout) }
       end
 
-      def write_config(backends)
+      def write_config
         f = nil
         begin
           f = Tempfile.new('haproxy')

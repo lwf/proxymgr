@@ -5,7 +5,7 @@ global
 defaults
 <% @defaults_config.each do |line| %>  <%= line %>
 <% end %>
-<% backends.each do |name, watcher| %>listen <%= name %> 0.0.0.0:<%= watcher.port %><% if watcher.listen_options %><% watcher.listen_options.each do |line| %>
+<% @backends.each do |name, watcher| %><% next unless @file_descriptors[watcher.port] %>listen <%= name %> fd@<%= @file_descriptors[watcher.port] %><% if watcher.listen_options %><% watcher.listen_options.each do |line| %>
   <%= line %><% end %><% end %>
 <% watcher.servers.each do |server| %>  server <%= server %> <%= server %><% if watcher.server_options %> <%= watcher.server_options.join(' ') %><% end %>
 <% end %><% end %>
