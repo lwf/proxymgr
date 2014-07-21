@@ -19,12 +19,11 @@ module ProxyMgr
       end
 
       def restart(fds = [])
-        p fds
         @mutex.synchronize do
           if @process
             run(@process.pid, fds)
           else
-            run
+            run(nil, fds)
           end
         end
       end
