@@ -36,7 +36,7 @@ module ProxyMgr
         rescue Errno::EPERM
         end
         sync_pipe[0].read(1)
-        3.upto(max_fds).each do |fd|
+        3.upto(Platform.max_fd).each do |fd|
           begin
             IO.for_fd(fd).close unless @fds.include? fd
           rescue ArgumentError, Errno::EBADF
@@ -91,10 +91,6 @@ module ProxyMgr
         @exit_code = result.exitstatus || result.termsig
       rescue Errno::ECHILD
       end
-    end
-
-    def max_fds
-      File.readlines('/proc/self/status').find { |x| x =~ /^FDSize:/ }.split(':').last.to_i
     end
 
     def self.register(pid, &blk)

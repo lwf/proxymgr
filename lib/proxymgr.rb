@@ -9,6 +9,7 @@ require 'proxymgr/process_manager'
 require 'proxymgr/haproxy'
 require 'proxymgr/sink'
 require 'proxymgr/watcher'
+require 'proxymgr/platform'
 
 module ProxyMgr
   def self.root
