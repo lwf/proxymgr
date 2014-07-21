@@ -20,6 +20,11 @@ module ProxyMgr
           return
         end
 
+        unless @port.is_a? Integer and (@port > 0 and @port <= 65535)
+          warn 'port is not an integer or not valid'
+          return
+        end
+
         unless !@listen_options || @listen_options.is_a?(Array)
           warn 'listen_options is not an array'
           return
