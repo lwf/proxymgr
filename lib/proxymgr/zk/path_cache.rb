@@ -75,7 +75,6 @@ module ProxyMgr
 
           state :shutdown do
             def call(type, data = nil)
-              puts "delayed call #{type}: #{data.inspect}"
               logger.debug "Received call request, but in shutdown so not doing anything: #{@path}"
             end
           end
