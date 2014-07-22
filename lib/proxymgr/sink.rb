@@ -13,6 +13,8 @@ module ProxyMgr
       @thread          = nil
       @cv              = ConditionVariable.new
       @mutex           = Mutex.new
+      @start_cv        = ConditionVariable.new
+      @start_mutex     = Mutex.new
       @backends        = nil
       @haproxy.start
       start
@@ -40,25 +42,29 @@ module ProxyMgr
     def start
       @thread = Thread.new do
         t1 = nil
-        loop do
-          if @timeout && t1 && AbsoluteTime.now - t1 >= @timeout && @backends
-            @mutex.synchronize do
+        @mutex.synchronize do
+          loop do
+            started! unless started?
+
+            if @timeout && t1 && AbsoluteTime.now - t1 >= @timeout && @backends
               @haproxy.update_backends(@backends)
 
               @timeout = nil
               @backends = nil
+            elsif t1
+              set_timeout
+              logger.debug "Waiting for #{@timeout}s or signal"
             end
-          elsif t1
-            set_timeout
-            logger.debug "Waiting for #{@timeout}s or signal"
-          end
 
-          t1 = AbsoluteTime.now
-          logger.debug 'Waiting to be signalled'
-          wait
+            t1 = AbsoluteTime.now
+            logger.debug 'Waiting to be signalled'
+            wait
+          end
         end
       end
       @thread.abort_on_exception = true
+
+      wait_for_started
     end
 
     def signal
@@ -66,12 +72,29 @@ module ProxyMgr
     end
 
     def wait
-      @mutex.synchronize { @cv.wait(@mutex, @timeout) }
+      @cv.wait(@mutex, @timeout)
     end
 
     def set_timeout
       @timeout = @timeout ? @timeout * @timeout : @default_timeout
       @timeout = @max_timeout if @timeout > @max_timeout
+    end
+
+    def started?
+      @start_cv == nil
+    end
+
+    def started!
+      @start_mutex.synchronize do
+        @start_cv.signal
+        @start_cv = nil
+      end
+    end
+
+    def wait_for_started
+      @start_mutex.synchronize do
+        @start_cv.wait(@start_mutex) if @start_cv
+      end
     end
   end
 end
