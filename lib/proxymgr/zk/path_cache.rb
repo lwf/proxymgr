@@ -96,7 +96,7 @@ module ProxyMgr
         end
 
         def set_watch
-          watcher = Zookeeper::Callbacks::WatcherCallback.create do |event|
+          watcher = @client.watcher_callback do |event|
             set_watch if event.type != Zookeeper::ZOO_SESSION_EVENT
           end
           begin

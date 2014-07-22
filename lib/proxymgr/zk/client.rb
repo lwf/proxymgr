@@ -46,6 +46,10 @@ module ProxyMgr
         @zookeeper.send(sym, *args, &blk)
       end
 
+      def watcher_callback(&blk)
+        Zookeeper::Callbacks::WatcherCallback.create(&blk)
+      end
+
       private
 
       def watcher(event)
@@ -64,7 +68,7 @@ module ProxyMgr
       end
 
       def wait_for_path(complete_path, wait_path, rest = [], &blk)
-        cb = ::Zookeeper::Callbacks::WatcherCallback.create do |event|
+        cb = watcher_callback do |event|
           if event.type != ::Zookeeper::ZOO_SESSION_EVENT
             next_path = join(wait_path, rest.first)
             if @zookeeper.get(:path => next_path)[:rc] == ::Zookeeper::ZOK
