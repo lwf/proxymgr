@@ -43,4 +43,18 @@ describe ProxyMgr::ZK::PathCache do
     @fake_zk.create(:path => '/a/b')
     called.should == true
   end
+
+  it 'calls the callback for each sub-path created with the appropriate data' do
+    paths = []
+    data  = []
+    path_cache = ProxyMgr::ZK::PathCache.new(@client, '/a') do |path, type, event|
+      paths << path
+      data << event.data
+    end
+    @fake_zk.create(:path => '/a')
+    @fake_zk.create(:path => '/a/b', :data => 'path1')
+    @fake_zk.create(:path => '/a/c', :data => 'path2')
+    data.should == ['path1', 'path2']
+    paths.should == ['/a/b', '/a/c']
+  end
 end
