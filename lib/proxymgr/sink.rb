@@ -1,7 +1,6 @@
 module ProxyMgr
   class Sink
     require 'absolute_time'
-    require 'set'
 
     include Logging
 
