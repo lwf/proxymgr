@@ -27,8 +27,8 @@ module ProxyMgr
           next if watcher.servers.empty?
           @backends[name] = watcher
         end
+        signal
       end
-      signal
     end
 
     def shutdown
@@ -68,7 +68,7 @@ module ProxyMgr
     end
 
     def signal
-      @mutex.synchronize { @cv.signal }
+      @cv.signal
     end
 
     def wait

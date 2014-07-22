@@ -6,7 +6,6 @@ module ProxyMgr
     end
 
     def update_backends(backends)
-      puts "update_bakcends"
       @backends = backends
       @blk.call
     end
