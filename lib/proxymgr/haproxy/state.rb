@@ -47,8 +47,8 @@ module ProxyMgr
                 @changeset = nil
                 @backends  = nil
               elsif @process.exited? and !sleep_interval
-                logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
                 sleep_interval = @sleep_interval
+                logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
                 next
               end
 
