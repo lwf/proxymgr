@@ -44,6 +44,16 @@ module ProxyMgr
 
       def shutdown; end
 
+      def ==(obj)
+        if obj.is_a? Watcher::Base
+          obj.listen_options == @listen_options and
+            obj.server_options == @server_options and
+            obj.port == @port
+        else
+          super
+        end
+      end
+
       private
 
       def warn(msg)

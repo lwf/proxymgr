@@ -3,68 +3,96 @@ require 'spec_helper'
 describe ProxyMgr::Haproxy::Updater, '#produce_changeset' do
   before do
     @socket  = double(ProxyMgr::Haproxy::Socket)
+    @sm      = double(ProxyMgr::ServiceManager)
     @updater = ProxyMgr::Haproxy::Updater.new(@socket)
   end
 
-  it 'should require restarts if no stats socket is available' do
-    @socket.should_receive(:connected?) { false }
-    changeset = @updater.produce_changeset(nil)
-    changeset.restart_needed?.should == true
-  end
-
-  it 'should require restarts if a new server is provided' do
-    @socket.should_receive(:connected?) { true }
-    @socket.should_receive(:servers) do
-      ['a', 'b'].map { |name| new_mock_server('dummy', 'name') }
+  context 'stats socket not available' do
+    before do
+      @socket.stub(:connected?) { false }
     end
-    watcher = double(ProxyMgr::Watcher::Base)
-    watcher.should_receive(:servers) { ['a', 'b', 'c'] }
-    changeset = @updater.produce_changeset('dummy' => watcher)
-    changeset.restart_needed?.should == true
-  end
 
-  it 'should disable servers if they are already added' do
-    @socket.should_receive(:connected?) { true }
-    @socket.should_receive(:servers) do
-      ['a', 'b', 'c'].map { |name| new_mock_server('dummy', name) }
+    it 'should require restarts if no stats socket is available' do
+      @socket.stub(:connected?) { false }
+      changeset = @updater.produce_changeset(nil)
+      changeset.restart_needed?.should == true
     end
-    watcher = double(ProxyMgr::Watcher::Base)
-    watcher.should_receive(:servers) { ['a', 'b'] }
-    changeset = @updater.produce_changeset('dummy' => watcher)
-    changeset.disable.should == {'dummy' => ['c']}
-    changeset.restart_needed?.should == false
   end
 
-  it 'should enable servers if they are down and added' do
-    @socket.should_receive(:connected?) { true }
-    @socket.should_receive(:servers) do
-      s = ['a', 'b'].map { |name| new_mock_server('dummy', name) }
-      s << new_mock_server('dummy', 'c', 'MAINT')
+  context 'stats socket available' do
+    before do
+      @socket.stub(:connected?) { true }
     end
-    watcher = double(ProxyMgr::Watcher::Base)
-    watcher.should_receive(:servers) { ['a', 'b', 'c'] }
-    changeset = @updater.produce_changeset('dummy' => watcher)
-    changeset.enable.should == {'dummy' => ['c']}
-    changeset.restart_needed?.should == false
-  end
 
-  it 'should require restart if a backend is added' do
-    @socket.should_receive(:connected?) { true }
-    @socket.should_receive(:servers) { [] }
-    watcher = double(ProxyMgr::Watcher::Base)
-    watcher.should_receive(:servers) { ['a', 'b'] }
-    changeset = @updater.produce_changeset('dummy' => watcher)
-    changeset.restart_needed?.should == true
-  end
-
-  it 'should require restart if a backend is deleted' do
-    @socket.should_receive(:connected?) { true }
-    @socket.should_receive(:servers) do
-      ['a', 'b', 'c'].map do |name|
-        new_mock_server('dummy', name)
+    it 'requires restarts if a new server is provided' do
+      @socket.should_receive(:servers) do
+        ['a', 'b'].map { |name| new_mock_server('dummy', 'name') }
       end
+      watcher = double(ProxyMgr::Watcher::Base)
+      watcher.should_receive(:servers) { ['a', 'b', 'c'] }
+      changeset = @updater.produce_changeset('dummy' => watcher)
+      changeset.restart_needed?.should == true
     end
-    changeset = @updater.produce_changeset({})
-    changeset.restart_needed?.should == true
+
+    it 'disables servers if they are already added' do
+      @socket.should_receive(:servers) { [] }
+      watcher = ProxyMgr::Watcher::Dummy.new('dummy', {}, @sm)
+      watcher.servers = ['a', 'b', 'c']
+      @updater.produce_changeset('dummy' => watcher)
+      @socket.should_receive(:servers) do
+        ['a', 'b', 'c'].map { |name| new_mock_server('dummy', name) }
+      end
+      watcher = ProxyMgr::Watcher::Dummy.new('dummy', {}, @sm)
+      watcher.servers = ['a', 'b']
+      changeset = @updater.produce_changeset('dummy' => watcher)
+      changeset.disable.should == {'dummy' => ['c']}
+      changeset.restart_needed?.should == false
+    end
+
+    it 'enables servers if they are down and added' do
+      @socket.should_receive(:servers) { [] }
+      watcher = ProxyMgr::Watcher::Dummy.new('dummy', {}, @sm)
+      watcher.servers = []
+      @updater.produce_changeset('dummy' => watcher)
+      @socket.should_receive(:servers) do
+        s = ['a', 'b'].map { |name| new_mock_server('dummy', name) }
+        s << new_mock_server('dummy', 'c', 'MAINT')
+      end
+      watcher = ProxyMgr::Watcher::Dummy.new('dummy', {}, @sm)
+      watcher.servers = ['a', 'b', 'c']
+      changeset = @updater.produce_changeset('dummy' => watcher)
+      changeset.enable.should == {'dummy' => ['c']}
+      changeset.restart_needed?.should == false
+    end
+
+    it 'requires restart if a backend is added' do
+      @socket.should_receive(:servers) { [] }
+      watcher = double(ProxyMgr::Watcher::Base)
+      watcher.should_receive(:servers) { ['a', 'b'] }
+      changeset = @updater.produce_changeset('dummy' => watcher)
+      changeset.restart_needed?.should == true
+    end
+
+    it 'requires restart if a backend is deleted' do
+      @socket.should_receive(:servers) do
+        ['a', 'b', 'c'].map do |name|
+          new_mock_server('dummy', name)
+        end
+      end
+      changeset = @updater.produce_changeset({})
+      changeset.restart_needed?.should == true
+    end
+
+    it 'requires restarting if listen_options is changed' do
+      @socket.should_receive(:servers) { [] }
+      watcher = ProxyMgr::Watcher::Dummy.new('dummy', {}, @sm)
+      watcher.servers = ['a']
+      @updater.produce_changeset('dummy' => watcher)
+      @socket.should_receive(:servers) { [new_mock_server('dummy', 'a')] }
+      watcher = ProxyMgr::Watcher::Dummy.new('dummy', {'listen_options' => ['test option']}, @sm)
+      watcher.servers = ['a']
+      changeset = @updater.produce_changeset('dummy' => watcher)
+      changeset.restart_needed?.should == true
+    end
   end
 end
