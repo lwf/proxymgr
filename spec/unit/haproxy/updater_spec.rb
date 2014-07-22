@@ -28,8 +28,8 @@ describe ProxyMgr::Haproxy::Updater, '#produce_changeset' do
       @socket.should_receive(:servers) do
         ['a', 'b'].map { |name| new_mock_server('dummy', 'name') }
       end
-      watcher = double(ProxyMgr::Watcher::Base)
-      watcher.should_receive(:servers) { ['a', 'b', 'c'] }
+      watcher = ProxyMgr::Watcher::Dummy.new('dummy', {}, @sm)
+      watcher.servers = ['a', 'b', 'c']
       changeset = @updater.produce_changeset('dummy' => watcher)
       changeset.restart_needed?.should == true
     end
