@@ -6,6 +6,8 @@ class FakeZookeeper
     @heartbeat = heartbeat
     @watcher   = watcher
 
+    @connected = true
+
     @state     = {:children => {}}
     @watches   = {}
   end
@@ -21,10 +23,16 @@ class FakeZookeeper
 
   def disconnected!
     call_session(Zookeeper::ZOO_CONNECTING_STATE)
+    @connected = false
   end
 
   def connected!
     call_session(Zookeeper::ZOO_CONNECTED_STATE)
+    @connected = true
+  end
+
+  def connected?
+    @connected
   end
 
   def get(opts)
