@@ -29,14 +29,14 @@ module ProxyMgr
         write_config
 
         @thread = Thread.new do
-          loop do
-            logger.debug "Waiting..."
-            wait
-
+          @mutex.synchronize do
             sleep_interval = nil
-            restart_needed = true
+            loop do
+              logger.debug "Waiting..."
+              wait(sleep_interval)
 
-            @mutex.synchronize do
+              restart_needed = true
+
               if @changeset or @backends
                 if @changeset
                   update_state_with_changeset
@@ -46,15 +46,15 @@ module ProxyMgr
                 write_config
                 @changeset = nil
                 @backends  = nil
-              elsif @process.exited?
-                sleep_interval = @sleep_interval
+              elsif @process.exited? and !sleep_interval
                 logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
+                sleep_interval = @sleep_interval
+                next
               end
+
+              sleep_interval = nil
+              @process.restart(@file_descriptors.values) if restart_needed
             end
-
-            sleep(sleep_interval) if sleep_interval # TODO: wait
-
-            @process.restart(@file_descriptors.values) if restart_needed
           end
         end
         @thread.abort_on_exception = true
@@ -104,7 +104,7 @@ module ProxyMgr
       end
 
       def wait(timeout = nil)
-        @mutex.synchronize { @cv.wait(@mutex, timeout) }
+        @cv.wait(@mutex, timeout)
       end
 
       def write_config
