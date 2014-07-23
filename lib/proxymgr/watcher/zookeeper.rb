@@ -27,7 +27,7 @@ module ProxyMgr
 
         unless @config['server'].is_a? String and
             @config['server'] =~ /^(?:.*:\d{1,6}){1,}$/
-          logger.warn "'server' is not a properly specified"
+          logger.warn "'server' is not properly specified"
           return
         end
 
