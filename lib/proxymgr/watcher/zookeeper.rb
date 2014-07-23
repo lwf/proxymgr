@@ -17,11 +17,21 @@ module ProxyMgr
       end
 
       def validate_config
-        @config['path'].is_a? String and
+        unless @config['path'].is_a? String and
           @config['path'] =~ /^\// and
-          @config['path'] =~ /\/$/ and
-          @config['server'].is_a? String and
-          @config['server'] =~ /^(?:.*:\d{1,6}){1,}$/
+          @config['path'] !~ /\/$/
+
+          logger.warn "'path' is not a valid Zookeeper path"
+          return
+        end
+
+        unless @config['server'].is_a? String and
+            @config['server'] =~ /^(?:.*:\d{1,6}){1,}$/
+          logger.warn "'server' is not a properly specified"
+          return
+        end
+
+        true
       end
 
       private
