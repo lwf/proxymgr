@@ -21,6 +21,7 @@ module ProxyMgr
             else
               restart_needed = true
             end
+            break if restart_needed
           end
           changeset = Set.new(restart_needed, {}, {})
           diff(new_state, proxy_state, changeset) unless restart_needed
