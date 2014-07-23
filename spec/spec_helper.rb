@@ -1,7 +1,6 @@
 require 'proxymgr'
 require 'support/mock_servers'
 require 'support/dummy_watcher'
-require 'support/fake_zookeeper'
 require 'support/fake_proxy'
 
 ProxyMgr::Logging.disable!
