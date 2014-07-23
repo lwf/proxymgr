@@ -35,6 +35,11 @@ module ProxyMgr
           return
         end
 
+        if has_validation? and !validate_config
+          warn 'config failed to validate'
+          return
+        end
+
         watch
       end
 
@@ -55,6 +60,10 @@ module ProxyMgr
       end
 
       private
+
+      def has_validation?
+        respond_to? :validate_config
+      end
 
       def warn(msg)
         logger.warn "#{@name}: #{msg}. This watcher will not start."

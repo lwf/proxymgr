@@ -13,7 +13,15 @@ module ProxyMgr
       end
 
       def shutdown
-        @zookeeper.close
+        @zookeeper.close if @zookeeper
+      end
+
+      def validate_config
+        @config['path'].is_a? String and
+          @config['path'] =~ /^\// and
+          @config['path'] =~ /\/$/ and
+          @config['server'].is_a? String and
+          @config['server'] =~ /^(?:.*:\d{1,6}){1,}$/
       end
 
       private
