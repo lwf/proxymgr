@@ -2,12 +2,13 @@ module ProxyMgr
   module Watcher
     class Zookeeper < Base
       require 'yajl/json_gem'
+      require 'zoology'
 
       def watch
-        @zookeeper  = ZK::Client.new(@config['server'])
-        @path_cache = ZK::PathCache.new(@zookeeper,
-                                        @config['path'],
-                                        &method(:watch_zookeeper))
+        @zookeeper  = Zoology::Client.new(@config['server'])
+        @path_cache = Zoology::PathCache.new(@zookeeper,
+                                             @config['path'],
+                                             &method(:watch_zookeeper))
         @zk_mapping = {}
         @zookeeper.connect
       end

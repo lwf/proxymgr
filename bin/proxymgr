@@ -27,6 +27,7 @@ rescue Docopt::Exit => e
 end
 
 ProxyMgr::Logging.level = opts['--debug'] ? Logger::DEBUG : Logger::INFO
+Zoology::Logging.level = ProxyMgr::Logging.level
 
 begin
   config = ProxyMgr::Config.new(opts['--config'])

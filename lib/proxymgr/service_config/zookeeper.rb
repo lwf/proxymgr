@@ -2,16 +2,17 @@ module ProxyMgr
   module ServiceConfig
     class Zookeeper < Base
       require 'yajl/json_gem'
+      require 'zoology'
 
       include Logging
 
       def start
         @services = {}
 
-        @client     = ZK::Client.new(@config['servers'])
-        @path_cache = ZK::PathCache.new(@client,
-                                        @config['path'],
-                                        &method(:watch))
+        @client     = Zoology::Client.new(@config['servers'])
+        @path_cache = Zoology::PathCache.new(@client,
+                                             @config['path'],
+                                             &method(:watch))
         @client.connect
       end
 
