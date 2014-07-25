@@ -1,3 +1,6 @@
+require 'simplecov'
+SimpleCov.start
+
 require 'proxymgr'
 require 'support/mock_servers'
 require 'support/dummy_watcher'

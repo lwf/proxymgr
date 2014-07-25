@@ -2,3 +2,4 @@ Dockerfile
 *.swp
 examples/dev.yml
 examples/docker.yml
+coverage/
