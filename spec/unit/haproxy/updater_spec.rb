@@ -73,6 +73,20 @@ describe ProxyMgr::Haproxy::Updater, '#produce_changeset' do
       changeset.restart_needed?.should == true
     end
 
+    it 'requires a restart if a server has not already been added/is disabled' do
+      @socket.stub(:servers) do
+        ['a', 'b'].map do |name|
+          new_mock_server('dummy', name)
+        end
+      end
+      watcher = double(ProxyMgr::Watcher::Base)
+      watcher.should_receive(:servers) { ['a', 'b'] }
+      changeset = @updater.produce_changeset('dummy' => watcher)
+      watcher.should_receive(:servers) { ['a', 'b', 'c'] }
+      changeset = @updater.produce_changeset('dummy' => watcher)
+      changeset.restart_needed?.should == true
+    end
+
     it 'requires restart if a backend is deleted' do
       @socket.stub(:servers) do
         ['a', 'b'].map do |name|
