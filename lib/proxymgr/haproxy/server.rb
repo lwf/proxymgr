@@ -16,14 +16,6 @@ module ProxyMgr
         @stats['svname']
       end
 
-      def disable
-        @haproxy.disable backend, name
-      end
-
-      def shutdown
-        @haproxy.shutdown backend, name
-      end
-
       def disabled?
         @stats['status'] == 'MAINT'
       end
