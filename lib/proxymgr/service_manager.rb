@@ -22,6 +22,7 @@ module ProxyMgr
         end
       rescue NameError
         logger.warn "Could not find implementation for #{type}. Not adding service #{name}"
+        nil
       end
     end
 

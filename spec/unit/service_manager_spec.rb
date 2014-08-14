@@ -36,4 +36,8 @@ describe ProxyMgr::ServiceManager do
     @sink.should_receive(:shutdown)
     @manager.shutdown
   end
+
+  it 'does not create services for non-existing watcher types' do
+    @manager.update_service('dummy', {'type' => 'NonExisting'}).should == nil
+  end
 end
