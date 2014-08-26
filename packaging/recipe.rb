@@ -12,7 +12,7 @@ class ProxyMgr < FPM::Cookery::Recipe
   description 'Manages Haproxy configuration dynamically'
   section     'admin'
 
-  depends 'ruby2.1'
+  depends 'ruby2.1', 'haproxy (>= 1.5)'
 
   def build
     File.open('Gemfile', 'w') do |fh|
