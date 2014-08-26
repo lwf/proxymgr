@@ -18,7 +18,8 @@ module ProxyMgr
         klass           = watcher_class(type)
         @service_mutex.synchronize do
           @services[name].shutdown if @services[name]
-          @services[name] = klass.new(name, config, self)
+          w = @services[name] = klass.new(name, config, self)
+          w.watch if w.valid?
         end
       rescue NameError
         logger.warn "Could not find implementation for #{type}. Not adding service #{name}"
