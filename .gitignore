@@ -3,3 +3,5 @@ Dockerfile
 examples/dev.yml
 examples/docker.yml
 coverage/
+packaging/pkg*
+packaging/tmp*
