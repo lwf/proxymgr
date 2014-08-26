@@ -11,6 +11,12 @@ describe ProxyMgr::ServiceManager do
     @manager.update_service('dummy', {'type' => 'dummy', 'config' => 'thing'})
   end
 
+  it 'starts services if valid' do
+    expect_any_instance_of(ProxyMgr::Watcher::Dummy).to receive(:watch)
+    ProxyMgr::Watcher::Dummy.any_instance.stub(:valid?) { true }
+    @manager.update_service('dummy', {'type' => 'dummy', 'config' => 'thing'})
+  end
+
   it 'shuts down old services when replaced' do
     @manager.update_service('dummy', {'type' => "dummy"})
     expect_any_instance_of(ProxyMgr::Watcher::Dummy).to receive(:shutdown)
