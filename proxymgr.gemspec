@@ -3,7 +3,7 @@ Gem::Specification.new do |gem|
   gem.version       = '0.1'
   gem.authors       = ['Torbjörn Norinder']
   gem.email         = ['torbjorn@genunix.se']
-  gem.description   = %q{Announces services}
+  gem.description   = %q{Manages Haproxy configuration dynamically}
   gem.summary       = gem.description
   gem.homepage      = 'https://github.com/campanja/proxymgr'
   gem.platform      = Gem::Platform::RUBY
