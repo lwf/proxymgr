@@ -1,7 +1,9 @@
 class ProxyMgr < FPM::Cookery::Recipe
+  gemspec = eval(File.read('../proxymgr.gemspec'))
+
   homepage    'http://github.com/campanja/proxymgr'
   name        'proxymgr'
-  version     '0.1'
+  version     gemspec.version.to_s
   source      'none', :with => :noop
 
   revision    '1'
@@ -19,7 +21,7 @@ class ProxyMgr < FPM::Cookery::Recipe
       fh.puts <<-EOF
 source "https://rubygems.org"
 
-gem '#{name}', '0.1', :git => 'git@github.com:campanja/proxymgr.git'
+gem '#{name}', '#{version}', :git => 'git@github.com:campanja/proxymgr.git'
 EOF
     end
     system 'bundle install --binstubs --standalone --path vendor/bundle'
