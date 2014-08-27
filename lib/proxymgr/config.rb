@@ -1,6 +1,7 @@
 module ProxyMgr
   class Config
     require 'yaml'
+    require 'erb'
 
     DEFAULTS = {
       'haproxy' => {
@@ -29,11 +30,14 @@ module ProxyMgr
         'socket_path' => :fullpath,
         'global'      => :array_of_strings,
         'default'     => :array_of_strings
+      },
+      'service_config' => {
+        'type' => :svconfig
       }
     }
 
     def initialize(file)
-      data    = interpolate_variables(File.read(file))
+      data    = ERB.new(File.read(file)).result(binding)
       @config = YAML.load(data) || {}
 
       merge_defaults!
@@ -45,15 +49,6 @@ module ProxyMgr
     end
 
     private
-
-    def interpolate_variables(data)
-      data.gsub(/\{\{\s+?(.*)\s+?\}\}/) do |_v|
-        unless ENV[Regexp.last_match[1]]
-          fail ConfigException "Environment variable #{Regexp.last_match[1]} is not set"
-        end
-        ENV[Regexp.last_match[1]]
-      end
-    end
 
     def merge_defaults!
       DEFAULTS.each do |key, value|
@@ -67,6 +62,11 @@ module ProxyMgr
 
     def validate_config
       validate_haproxy
+      validate_svconfig
+    end
+
+    def validate_svconfig
+      validate_hash(@config['service_config'], VALIDATORS['service_config'])
     end
 
     def validate_haproxy
@@ -74,6 +74,8 @@ module ProxyMgr
     end
 
     def validate_hash(data, validators)
+      fail ConfigException.new "not a hash" unless data.is_a? Hash
+
       data.each do |key, value|
         Validators.send(validators[key], key, value) if validators[key]
       end
@@ -101,6 +103,16 @@ module ProxyMgr
           ary.each_with_index do |value, i|
             should("#{key}[#{i}] should be a string") do
               value.is_a? String
+            end
+          end
+        end
+
+        def svconfig(key, type)
+          should("#{key} should be a service config implementation") do
+            begin
+              ServiceConfig.const_get(type.capitalize)
+            rescue NameError
+              false
             end
           end
         end
