@@ -5,3 +5,4 @@ examples/docker.yml
 coverage/
 packaging/pkg*
 packaging/tmp*
+pkg
