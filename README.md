@@ -87,8 +87,8 @@ Each service_config has its own configuration keys/values, which should also be 
 
 ProxyMgr manages the Haproxy process directly; it does not rely on external process managers. This also enables ProxyMgr to provide seamless
 reloads by opening listen sockets and passing them to Haproxy; as the listen socket remains open in ProxyMgr (the parent process), the kernel
-will keep accepting connections even in the window between when an old Haproxy process has stopped accepting connections and a new process has not
-yet begun accepting them.
+will keep accepting connections during the window between when an old Haproxy process has stopped and a new process has not yet begun handling
+requests.
 
 ProxyMgr will attempt to avoid reloading Haproxy whenever necessary if stats_socket is configured. This is achieved by disabling and enabling
 services through the stats socket when they become unavailable/available:
