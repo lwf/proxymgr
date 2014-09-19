@@ -9,7 +9,7 @@ class ProxyMgr < FPM::Cookery::Recipe
   revision    '1'
   vendor      'campanja'
   maintainer  'Team Omega <omega@campanja.com>'
-  license     'MIT'
+  license     'APL 2.0'
 
   description 'Manages Haproxy configuration dynamically'
   section     'admin'
