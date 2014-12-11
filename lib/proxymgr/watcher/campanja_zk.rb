@@ -11,7 +11,8 @@ module ProxyMgr
       end
 
       def update_servers(children)
-        servers = children.map { |child| "#{child}:#{@config['port']}" }.sort
+        port = @config['remote_port'] || @config['port']
+        servers = children.map { |child| "#{child}:#{port}" }.sort
         @servers = servers
         @manager.update_backends
       end
