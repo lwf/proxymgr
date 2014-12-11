@@ -50,6 +50,8 @@ end
 service_manager   = nil
 begin
   sink            = ProxyMgr::Sink.new(haproxy)
+  Signal.trap(:HUP) { Thread.new { sink.force_update }.join }
+
   service_manager = ProxyMgr::ServiceManager.new(sink)
   service_config  = ProxyMgr::ServiceConfig.create(service_manager,
                                                    config['service_config'])

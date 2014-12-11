@@ -37,20 +37,19 @@ module ProxyMgr
 
               restart_needed = true
 
-              if @changeset or @backends
-                if @changeset
-                  update_state_with_changeset
-                  restart_needed = @changeset.restart_needed?
-                end
-                @file_descriptors = @socket_manager.update(@backends)
-                write_config
+              if @changeset
+                update_state_with_changeset
+                restart_needed = @changeset.restart_needed?
                 @changeset = nil
-                @backends  = nil
               elsif @process.exited? and !sleep_interval
                 sleep_interval = @sleep_interval
                 logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
                 next
               end
+
+              @file_descriptors = @socket_manager.update(@backends)
+              write_config
+              # TODO: figure out if the config has changed. if so, restart the process.
 
               sleep_interval = nil
               @process.restart(@file_descriptors.values) if restart_needed

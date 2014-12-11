@@ -16,17 +16,25 @@ module ProxyMgr
       @start_cv        = ConditionVariable.new
       @start_mutex     = Mutex.new
       @backends        = nil
+      @force_update    = false
       @haproxy.start
       start
     end
 
     def update_backends(backends)
       @mutex.synchronize do
-        @backends ||= {}
+        @backends = {}
         backends.each do |name, watcher|
           next if watcher.servers.empty?
           @backends[name] = watcher
         end
+        signal
+      end
+    end
+
+    def force_update
+      @mutex.synchronize do
+        @force_update = true
         signal
       end
     end
@@ -46,14 +54,16 @@ module ProxyMgr
           loop do
             started! unless started?
 
-            if @timeout && t1 && AbsoluteTime.now - t1 >= @timeout && @backends
-              @haproxy.update_backends(@backends)
+            if @backends
+              if @force_update || (@timeout && t1 && AbsoluteTime.now - t1 >= @timeout)
+                @haproxy.update_backends(@backends)
 
-              @timeout = nil
-              @backends = nil
-            elsif t1
-              set_timeout
-              logger.debug "Waiting for #{@timeout}s or signal"
+                @timeout = nil
+                @force_update = false
+              elsif t1
+                set_timeout
+                logger.debug "Waiting for #{@timeout}s or signal"
+              end
             end
 
             t1 = AbsoluteTime.now
