@@ -8,34 +8,29 @@ module ProxyMgr
     require 'proxymgr/haproxy/state'
     require 'proxymgr/haproxy/socket_manager'
 
-    def initialize(path, config_file, opts = {})
-      @path             = path
-      @config_file      = config_file
+    include Configurable
 
-      @socket_path      = opts[:socket]
-      @global_config    = opts[:global]
-      @defaults_config  = opts[:defaults]
+    attr_accessor :socket_path
 
-      @socket           = @socket_path ? Socket.new(@socket_path) : nil
+    def initialize
+      config_attr :config_file, :path, :global, :defaults
 
-      @control          = nil
+      @socket         = Socket.new
+      @control        = Control.new
+      @socket_manager = SocketManager.new
+      @state          = State.new(@control, @socket_manager)
+      @updater        = Updater.new(@socket)
     end
 
     def version
-      `#{@path} -v`[/version ([\d\.]+)/, 1].to_f
+      `#{path} -v`[/version ([\d\.]+)/, 1].to_f
     end
 
     def start
-      @socket         = @socket_path ? Socket.new(@socket_path) : nil
-      @control        = Control.new(@path, @config_file)
-      opts            = {:defaults    => @defaults_config,
-                         :global      => @global_config,
-                         :socket_path => @socket_path}
-      @socket_manager = SocketManager.new
-      @state          = State.new(@control, @config_file, @socket_manager, @socket, opts)
-      @updater        = Updater.new(@socket)
-
-      @state.start
+      configured do
+        configure!
+        @state.start
+      end
     end
 
     def shutdown
@@ -46,6 +41,20 @@ module ProxyMgr
     def update_backends(watchers)
       changeset = @updater.produce_changeset(watchers)
       @state.update_state(watchers, changeset)
+    end
+
+    private
+
+    def configure!
+      @control.config_file   = config_file
+      @control.path          = path
+
+      @socket.path           = socket_path
+
+      @state.config_file     = config_file
+      @state.global_config   = global
+      @state.defaults_config = defaults
+      @state.socket_path     = socket_path
     end
   end
 end

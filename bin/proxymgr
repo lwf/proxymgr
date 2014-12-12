@@ -36,12 +36,14 @@ rescue ProxyMgr::Config::ConfigException => e
   exit 1
 end
 
-haproxy_config  = config['haproxy']
-haproxy         = ProxyMgr::Haproxy.new(haproxy_config['path'],
-                                        haproxy_config['config_path'],
-                                        :socket   => haproxy_config['socket_path'],
-                                        :global   => haproxy_config['global'],
-                                        :defaults => haproxy_config['defaults'])
+haproxy_config      = config['haproxy']
+haproxy             = ProxyMgr::Haproxy.new
+haproxy.path        = haproxy_config['path']
+haproxy.config_file = haproxy_config['config_path']
+haproxy.socket_path = haproxy_config['socket_path']
+haproxy.global      = haproxy_config['global']
+haproxy.defaults    = haproxy_config['defaults']
+
 if haproxy.version < 1.5
   $stderr.puts 'ProxyMgr requires haproxy version 1.5 or later.'
   exit 1

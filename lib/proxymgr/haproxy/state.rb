@@ -5,67 +5,68 @@ module ProxyMgr
       require 'pathname'
       require 'erb'
 
-      include Logging
+      include Logging, Configurable
 
-      def initialize(process, config_file, socket_manager, socket = nil, opts = {})
+      attr_accessor :socket_path
+
+      def initialize(process, socket_manager)
         @process         = process
-        @config_file     = config_file
-        @socket          = socket
         @socket_manager  = socket_manager
 
-        @sleep_interval  = opts[:sleep_interval] || 5
-        @global_config   = opts[:global]
-        @defaults_config = opts[:defaults]
-        @socket_path     = opts[:socket_path]
+        @sleep_interval  = 5
 
         @file_descriptors = {}
         @backends         = {}
         @config_template  = ERB.new(File.read(File.join(ProxyMgr.template_dir, 'haproxy.cfg.erb')))
         @mutex            = Mutex.new
         @cv               = ConditionVariable.new
+
+        config_attr :config_file, :global_config, :defaults_config
       end
 
       def start
-        write_config
+        configured do
+          write_config
 
-        @thread = Thread.new do
-          @mutex.synchronize do
-            sleep_interval = nil
-            loop do
-              logger.debug "Waiting..."
-              wait(sleep_interval)
-
-              restart_needed = true
-
-              if @changeset
-                update_state_with_changeset
-                restart_needed = @changeset.restart_needed?
-                @changeset = nil
-              elsif @process.exited? and !sleep_interval
-                sleep_interval = @sleep_interval
-                logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
-                next
-              end
-
-              @file_descriptors = @socket_manager.update(@backends)
-              write_config
-              # TODO: figure out if the config has changed. if so, restart the process.
-
+          @thread = Thread.new do
+            @mutex.synchronize do
               sleep_interval = nil
-              @process.restart(@file_descriptors.values) if restart_needed
+              loop do
+                logger.debug "Waiting..."
+                wait(sleep_interval)
+
+                restart_needed = true
+
+                if @changeset
+                  update_state_with_changeset
+                  restart_needed = @changeset.restart_needed?
+                  @changeset = nil
+                elsif @process.exited? and !sleep_interval
+                  sleep_interval = @sleep_interval
+                  logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
+                  next
+                end
+
+                @file_descriptors = @socket_manager.update(@backends)
+                write_config
+                # TODO: figure out if the config has changed. if so, restart the process.
+
+                sleep_interval = nil
+                @process.restart(@file_descriptors.values) if restart_needed
+              end
             end
           end
-        end
-        @thread.abort_on_exception = true
+          @thread.abort_on_exception = true
 
-        @process.on_stop do |status|
-          Thread.new { signal }.join if @process.exited?
+          @process.on_stop do |status|
+            Thread.new { signal }.join if @process.exited?
+          end
+          @process.start
         end
-        @process.start
       end
 
       def socket?
-        @socket and @socket.connected?
+        socket and socket.connected?
       end
 
       def update_state(backends, changeset)
@@ -88,13 +89,19 @@ module ProxyMgr
 
       private
 
+      def socket
+        @socket ||= Socket.new
+        @socket.path = @socket_path
+        @socket
+      end
+
       def update_state_with_changeset
         @changeset.disable.each do |backend, hosts|
-          hosts.each { |host| @socket.disable backend, host }
+          hosts.each { |host| socket.disable backend, host }
         end
 
         @changeset.enable.each do |backend, hosts|
-          hosts.each { |host| @socket.enable backend, host }
+          hosts.each { |host| socket.enable backend, host }
         end
       end
 
@@ -112,9 +119,9 @@ module ProxyMgr
           f = Tempfile.new('haproxy')
           f.write @config_template.result(binding)
           f.close
-          Pathname.new(f.path).rename(@config_file)
+          Pathname.new(f.path).rename(config_file)
         rescue Exception => e
-          logger.warn "Unable to write to #{@config_file}: #{e}"
+          logger.warn "Unable to write to #{config_file}: #{e}"
           File.unlink f.path if f
         end
       end

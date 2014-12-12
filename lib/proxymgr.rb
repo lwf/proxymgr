@@ -1,3 +1,4 @@
+require 'proxymgr/configurable'
 require 'proxymgr/logging'
 require 'proxymgr/config'
 require 'proxymgr/callbacks'

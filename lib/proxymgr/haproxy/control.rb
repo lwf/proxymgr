@@ -1,16 +1,14 @@
 module ProxyMgr
   class Haproxy
     class Control
-      include Callbacks
+      include Callbacks, Configurable
 
       attr_reader :exit_code
 
-      def initialize(path, config_file)
-        @path        = path
-        @config_file = config_file
-
+      def initialize
         @mutex       = Mutex.new
 
+        config_attr :path, :config_file
         callbacks :on_stop
       end
 
@@ -19,11 +17,13 @@ module ProxyMgr
       end
 
       def restart(fds = [])
-        @mutex.synchronize do
-          if @process
-            run(@process.pid, fds)
-          else
-            run(nil, fds)
+        configured do
+          @mutex.synchronize do
+            if @process
+              run(@process.pid, fds)
+            else
+              run(nil, fds)
+            end
           end
         end
       end
@@ -36,7 +36,7 @@ module ProxyMgr
 
       def run(pid = nil, fds = [])
         @process.replace if @process
-        @process = Process.new(@path, @config_file, fds, pid) do |status|
+        @process = Process.new(path, config_file, fds, pid) do |status|
           call(:on_stop, status)
         end
         @process.start

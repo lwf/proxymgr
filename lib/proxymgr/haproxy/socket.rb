@@ -3,10 +3,10 @@ module ProxyMgr
     class Socket
       require 'socket'
 
-      attr_reader :path
+      include Configurable
 
-      def initialize(path)
-        @path = path
+      def initialize
+        config_attr :path
       end
 
       def stats
@@ -43,6 +43,8 @@ module ProxyMgr
       end
 
       def connected?
+        return false unless configured?
+
         begin
           with do |socket|
             socket.write "show info"
@@ -54,12 +56,14 @@ module ProxyMgr
       private
 
       def with
-        socket = nil
-        begin
-          socket = UNIXSocket.new(@path)
-          yield socket
-        ensure
-          socket.close if socket
+        configured do
+          socket = nil
+          begin
+            socket = UNIXSocket.new(path)
+            yield socket
+          ensure
+            socket.close if socket
+          end
         end
       end
     end

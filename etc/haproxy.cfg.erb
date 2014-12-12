@@ -1,9 +1,9 @@
 global
   stats socket <%= @socket_path %> mode 666 level admin
-<% @global_config.each do |line| %>  <%= line %>
+<% global_config.each do |line| %>  <%= line %>
 <% end %>
 defaults
-<% @defaults_config.each do |line| %>  <%= line %>
+<% defaults_config.each do |line| %>  <%= line %>
 <% end %>
 <% @backends.each do |name, watcher| %><% next unless @file_descriptors[watcher.port] %>listen <%= name %> fd@<%= @file_descriptors[watcher.port] %><% if watcher.listen_options %><% watcher.listen_options.each do |line| %>
   <%= line %><% end %><% end %>
