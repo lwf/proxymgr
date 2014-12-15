@@ -4,8 +4,6 @@ module ProxyMgr
       def initialize(manager, config)
         @manager = manager
         @config  = config
-
-        start
       end
 
       def start

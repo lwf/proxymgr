@@ -15,6 +15,8 @@ module ProxyMgr
 
         @sleep_interval  = 5
 
+        @force_restart    = false
+
         @file_descriptors = {}
         @backends         = {}
         @config_template  = ERB.new(File.read(File.join(ProxyMgr.template_dir, 'haproxy.cfg.erb')))
@@ -37,10 +39,9 @@ module ProxyMgr
 
                 restart_needed = true
 
-                if @changeset
+                if @changeset && !@force_restart
                   update_state_with_changeset
                   restart_needed = @changeset.restart_needed?
-                  @changeset = nil
                 elsif @process.exited? and !sleep_interval
                   sleep_interval = @sleep_interval
                   logger.info "Haproxy exited abnormally. Sleeping for #{sleep_interval}s"
@@ -49,9 +50,9 @@ module ProxyMgr
 
                 @file_descriptors = @socket_manager.update(@backends)
                 write_config
-                # TODO: figure out if the config has changed. if so, restart the process.
 
-                sleep_interval = nil
+                @changeset = nil
+                @force_restart = false
                 @process.restart(@file_descriptors.values) if restart_needed
               end
             end
@@ -73,6 +74,13 @@ module ProxyMgr
         @mutex.synchronize do
           @changeset = changeset
           @backends  = backends
+        end
+        signal
+      end
+
+      def reload
+        @mutex.synchronize do
+          @force_restart = true
         end
         signal
       end

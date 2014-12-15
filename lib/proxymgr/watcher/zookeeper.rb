@@ -14,6 +14,7 @@ module ProxyMgr
       end
 
       def shutdown
+        logger.debug "shtudown watcher #{@config['path']}"
         @zookeeper.close if @zookeeper
       end
 

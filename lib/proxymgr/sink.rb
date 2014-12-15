@@ -17,8 +17,6 @@ module ProxyMgr
       @start_mutex     = Mutex.new
       @backends        = nil
       @force_update    = false
-      @haproxy.start
-      start
     end
 
     def update_backends(backends)
@@ -45,9 +43,14 @@ module ProxyMgr
       @haproxy.shutdown
     end
 
+    def start
+      @haproxy.start
+      start_thread
+    end
+
     private
 
-    def start
+    def start_thread
       @thread = Thread.new do
         t1 = nil
         @mutex.synchronize do

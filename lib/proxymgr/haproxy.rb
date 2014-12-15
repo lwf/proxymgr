@@ -43,6 +43,13 @@ module ProxyMgr
       @state.update_state(watchers, changeset)
     end
 
+    def reload
+      configured do
+        configure!
+        @state.reload
+      end
+    end
+
     private
 
     def configure!

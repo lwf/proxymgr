@@ -7,7 +7,6 @@ module ProxyMgr
       'haproxy' => {
         'path'        => 'haproxy',
         'config_path' => '/etc/haproxy/haproxy.cfg',
-        'socket_path' => '/var/lib/haproxy.sock',
         'global'      => ['maxconn 4096',
                           'log  127.0.0.1 local0',
                           'log  127.0.0.1 local1 notice'],

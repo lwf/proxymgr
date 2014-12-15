@@ -7,6 +7,7 @@ module ProxyMgr
       include Logging
 
       def start
+        logger.debug "starting service_config"
         @services = {}
 
         @client     = Zoology::Client.new(@config['servers'])

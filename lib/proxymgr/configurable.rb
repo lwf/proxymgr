@@ -4,7 +4,7 @@ module ProxyMgr
       @config_required ||= []
       @config_required = @config_required + sym
 
-      @config_vars = {}
+      @config_vars ||= {}
 
       @config_required.each do |c|
         self.class.send(:define_method, c) { @config_vars[c] }
@@ -21,8 +21,8 @@ module ProxyMgr
     end
 
     def configured?
-      diff = @config_required - @config_vars.keys
-      return true if diff.empty?
+      diff = @config_required - @config_vars.map { |k,v| k if v }.compact
+      diff.empty?
     end
 
     class NotConfiguredException < Exception; end
