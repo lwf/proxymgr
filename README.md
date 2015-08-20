@@ -97,3 +97,7 @@ services through the stats socket when they become unavailable/available:
 * If a server which as previously been removed and disabled is added, ProxyMgr will re-enable it.
 * If a new server is added, ProxyMgr will add it to the configuration and reload Haproxy.
 * If a new backend is added, ProxyMgr will add it to the configuration and reload Haproxy.
+
+## License
+
+This project is licensed under the terms of the Apache License, version 2.0.
